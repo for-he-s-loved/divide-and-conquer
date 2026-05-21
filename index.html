@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
+<title>Divide &amp; Conquer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+  <div class="bg-orb orb-3"></div>
+
+  <div id="role-screen" class="screen">
+    <div class="brand">
+      <div class="brand-mark">D&amp;C</div>
+      <h1>Divide &amp; Conquer</h1>
+      <p class="tagline">Peer-to-peer problem solving. Both players contribute — or no one advances.</p>
+    </div>
+
+    <div class="role-grid">
+      <div class="card role-card">
+        <div class="role-icon">🎓</div>
+        <h2>I'm a Teacher</h2>
+        <p>Create a class, pick a question pack, and share the class code with your students.</p>
+        <button id="role-teacher-btn" type="button" class="big-btn primary" onclick="(function(){try{App.openTeacherConsole();}catch(e){alert('Open Console failed: '+e.message);}})()">Open Teacher Console</button>
+      </div>
+      <div class="card role-card">
+        <div class="role-icon">🎒</div>
+        <h2>I'm a Student</h2>
+        <p>Enter the class code your teacher gave you, then pair up with a partner.</p>
+        <button id="role-student-btn" type="button" class="big-btn">Continue as Student →</button>
+      </div>
+    </div>
+
+    <div class="lobby-foot">Built on free, open web tech — works on any laptop, Chromebook, or tablet.</div>
+  </div>
+
+  <div id="class-screen" class="screen hidden">
+    <div class="brand small">
+      <div class="brand-mark">D&amp;C</div>
+    </div>
+    <div class="card class-entry-card">
+      <div class="step-eyebrow">Step 1 of 2</div>
+      <h2>Who are you?</h2>
+      <p>Type your name, then enter the class code your teacher gave you.</p>
+      <label class="field-label" for="student-name">Your name</label>
+      <input id="student-name" maxlength="20" placeholder="e.g. Alex" autocomplete="off" />
+      <label class="field-label" for="student-class-code">Class code</label>
+      <input id="student-class-code" maxlength="4" placeholder="ABCD" autocomplete="off" />
+      <button id="class-continue-btn" type="button" class="big-btn primary">Continue →</button>
+      <div class="step-actions">
+        <button id="class-skip-btn" type="button" class="ghost-btn">Skip — play without a class</button>
+        <button id="class-back-btn" type="button" class="ghost-btn">← Back</button>
+      </div>
+      <div id="class-status" class="status"></div>
+    </div>
+  </div>
+
+  <div id="pair-screen" class="screen hidden">
+    <div class="brand small">
+      <div class="brand-mark">D&amp;C</div>
+    </div>
+
+    <div class="step-eyebrow center">Step 2 of 2 · Find your partner</div>
+    <h2 class="pair-title">Pair up with another student</h2>
+    <p class="pair-sub">One of you creates a pair code, the other types it in. You play together as a team.</p>
+
+    <div class="pair-grid">
+      <div class="card host-card">
+        <div class="card-icon">⚡</div>
+        <h3>Create a Pair Code</h3>
+        <p>Generate a code and share it with your partner.</p>
+        <button id="host-btn" class="big-btn primary">Create Pair Code</button>
+      </div>
+      <div class="card join-card">
+        <div class="card-icon">🔗</div>
+        <h3>Join Your Partner</h3>
+        <p>Enter the 4-letter code your partner shared.</p>
+        <div class="join-row">
+          <input id="code-input" maxlength="4" placeholder="CODE" autocomplete="off" />
+          <button id="join-btn" class="big-btn">Join</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="lobby-status" class="status"></div>
+
+    <div class="pair-foot">
+      <span id="pair-class-label" class="pair-class-label hidden">Class: <strong id="pair-class-code">----</strong></span>
+      <button id="pair-back-btn" type="button" class="ghost-btn">← Back</button>
+    </div>
+  </div>
+
+  <span id="active-pack-name" class="hidden">Multiplication Drills</span>
+  <span id="active-pack-meta" class="hidden">10 questions</span>
+  <input id="class-code-input" class="hidden" />
+
+  <div id="waiting" class="screen hidden">
+    <div class="brand small">
+      <div class="brand-mark">D&amp;C</div>
+    </div>
+    <div class="card waiting-card">
+      <h2>Your Room Code</h2>
+      <div id="room-code" class="room-code">----</div>
+      <button id="copy-code" class="ghost-btn">Copy code</button>
+      <div class="status pulse">Waiting for player 2 to join…</div>
+    </div>
+  </div>
+
+  <div id="game-screen" class="screen hidden">
+    <header class="hud">
+      <div class="hud-left">
+        <div class="brand-mark small">D&amp;C</div>
+        <div class="hud-room">Room <span id="hud-room-code">----</span></div>
+        <div id="round-indicator" class="hud-pill round-indicator">Round –/–</div>
+      </div>
+      <div class="hud-right">
+        <div id="timer" class="hud-pill timer">00:00</div>
+        <button id="mic-btn" class="hud-pill mic-btn" type="button">
+          <span id="mic-icon">🎤</span>
+          <span id="mic-label">Enable voice</span>
+        </button>
+        <button id="music-btn" class="hud-pill music-btn" type="button" title="Toggle music">
+          <span id="music-icon">🎵</span>
+          <span id="music-label">Music</span>
+        </button>
+        <div id="key-indicator" class="hud-pill key-indicator hidden">🔑 <span id="key-status">—</span></div>
+        <div id="you-label" class="hud-pill">You: P?</div>
+        <div id="conn-status" class="hud-pill connected">● Connected</div>
+      </div>
+    </header>
+
+    <div class="game-row">
+      <div id="game-container"></div>
+      <aside id="sidebar">
+        <div id="question-panel" class="panel question-panel hidden">
+          <div class="panel-header">
+            <span class="panel-eyebrow">Your Question</span>
+            <span class="panel-sub">Only you can answer this</span>
+          </div>
+          <div id="question-text"></div>
+          <div id="timer-bar" class="timer-bar hidden"><div id="timer-bar-fill"></div></div>
+          <div id="answer-row-short" class="answer-row">
+            <input id="answer-input" type="number" inputmode="numeric" placeholder="Answer" autocomplete="off" />
+            <button id="answer-submit">Submit</button>
+          </div>
+          <div id="answer-row-mc" class="answer-row-mc hidden"></div>
+          <div id="answer-feedback"></div>
+        </div>
+
+        <div class="panel chat-panel">
+          <div class="panel-header">
+            <span class="panel-eyebrow">Team Chat</span>
+            <span class="panel-sub">Strategize, don't share answers</span>
+          </div>
+          <div id="chat-log"></div>
+          <div class="chat-input-row">
+            <input id="chat-input" placeholder="Message your partner…" maxlength="140" />
+            <button id="chat-send">→</button>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <div id="content-modal" class="overlay hidden">
+    <div class="modal-card content-modal-card">
+      <div class="modal-header">
+        <div>
+          <div class="modal-eyebrow">Content Library</div>
+          <h2>Manage Question Packs</h2>
+        </div>
+        <button id="content-close" type="button" class="ghost-btn" onclick="Teacher.close()">Close</button>
+      </div>
+
+      <div class="content-body">
+        <aside class="pack-list">
+          <div class="pack-list-header">
+            <span>Packs</span>
+            <button id="new-pack-btn" type="button" class="ghost-btn small" onclick="Teacher.newPack()">+ New</button>
+          </div>
+          <div id="pack-list-items"></div>
+          <div class="pack-list-footer">
+            <button id="import-pack-btn" type="button" class="ghost-btn small" onclick="document.getElementById('import-file').click()">⬇ Import JSON</button>
+            <input id="import-file" type="file" accept="application/json,.json" class="hidden" />
+          </div>
+        </aside>
+
+        <section id="pack-editor" class="pack-editor">
+          <div class="pack-editor-empty">Select a pack to view or edit.</div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <div id="round-complete" class="overlay hidden">
+    <div class="round-card">
+      <div class="round-eyebrow">Round Complete</div>
+      <div id="round-complete-num" class="round-num">1</div>
+      <h2 id="round-complete-title">Nice work!</h2>
+      <p id="round-complete-sub">Get ready for the next round.</p>
+      <div class="round-stats">
+        <div class="ready-row">
+          <span class="ready-dot" id="ready-me">●</span> You
+        </div>
+        <div class="ready-row">
+          <span class="ready-dot" id="ready-them">○</span> Partner
+        </div>
+      </div>
+      <button id="continue-btn" class="big-btn primary">Continue →</button>
+      <div id="continue-hint" class="continue-hint">Both players must click to advance</div>
+    </div>
+  </div>
+
+  <div id="teacher-screen" class="screen hidden">
+    <header class="teacher-header">
+      <div class="brand small">
+        <div class="brand-mark">D&amp;C</div>
+        <h1>Teacher Console</h1>
+      </div>
+      <div class="teacher-class-code">
+        <span class="teacher-eyebrow">Class code</span>
+        <div id="teacher-class-code" class="room-code">----</div>
+        <button id="teacher-copy-code" type="button" class="ghost-btn small">Copy</button>
+      </div>
+      <button id="teacher-exit" type="button" class="ghost-btn">Exit</button>
+    </header>
+
+    <div class="teacher-grid">
+      <section class="teacher-panel">
+        <div class="panel-header">
+          <span class="panel-eyebrow">Active Pack</span>
+          <span class="panel-sub">Pushed to every connected student</span>
+        </div>
+        <div class="teacher-pack-row">
+          <strong id="teacher-active-pack">—</strong>
+          <span id="teacher-active-pack-meta" class="pack-bar-meta">—</span>
+        </div>
+        <div class="teacher-pack-actions">
+          <button id="teacher-manage-content" type="button" class="ghost-btn">📚 Manage Packs</button>
+          <button id="teacher-push-pack" type="button" class="big-btn primary">⤴ Push to Class</button>
+        </div>
+      </section>
+
+      <section class="teacher-panel">
+        <div class="panel-header">
+          <span class="panel-eyebrow">Broadcast</span>
+          <span class="panel-sub">Sent to every student's chat</span>
+        </div>
+        <div class="teacher-broadcast-row">
+          <input id="teacher-broadcast-input" placeholder="Announcement…" maxlength="200" />
+          <button id="teacher-broadcast-send" type="button">Send</button>
+        </div>
+      </section>
+
+      <section class="teacher-panel roster-panel">
+        <div class="panel-header">
+          <span class="panel-eyebrow">Roster</span>
+          <span class="panel-sub"><span id="roster-count">0</span> connected</span>
+        </div>
+        <div id="roster-list" class="roster-list">
+          <div class="roster-empty">Waiting for students to join the class…</div>
+        </div>
+      </section>
+
+      <section class="teacher-panel leaderboard-panel">
+        <div class="panel-header">
+          <span class="panel-eyebrow">Leaderboard</span>
+          <span class="panel-sub">Fastest completions</span>
+        </div>
+        <div id="leaderboard-list" class="leaderboard-list">
+          <div class="roster-empty">No completions yet.</div>
+        </div>
+        <div class="leaderboard-actions">
+          <button id="leaderboard-clear" type="button" class="ghost-btn small">Clear</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div id="win-screen" class="screen hidden">
+    <canvas id="confetti"></canvas>
+    <div class="win-card">
+      <div class="win-trophy">🏆</div>
+      <h1>You Conquered It</h1>
+      <p>Both players reached the finish together.</p>
+      <div class="final-time">Final time: <span id="final-time">--:--</span></div>
+      <button onclick="location.reload()" class="big-btn primary">Play Again</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script>window.__BUST=Date.now();</script>
+  <script>document.write('<scr'+'ipt src="js/sfx.js?v='+__BUST+'"></scr'+'ipt>');</script>
+  <script>document.write('<scr'+'ipt src="js/music.js?v='+__BUST+'"></scr'+'ipt>');</script>
+  <script>document.write('<scr'+'ipt src="js/packs.js?v='+__BUST+'"></scr'+'ipt>');</script>
+  <script>document.write('<scr'+'ipt src="js/teacher.js?v='+__BUST+'"></scr'+'ipt>');</script>
+  <script>document.write('<scr'+'ipt src="js/questions.js?v='+__BUST+'"></scr'+'ipt>');</script>
+  <script>document.write('<scr'+'ipt src="js/peer.js?v='+__BUST+'"></scr'+'ipt>');</script>
+  <script>document.write('<scr'+'ipt src="js/classroom.js?v='+__BUST+'"></scr'+'ipt>');</script>
+  <script>document.write('<scr'+'ipt src="js/voice.js?v='+__BUST+'"></scr'+'ipt>');</script>
+  <script>document.write('<scr'+'ipt src="js/game.js?v='+__BUST+'"></scr'+'ipt>');</script>
+  <script>document.write('<scr'+'ipt src="js/app.js?v='+__BUST+'"></scr'+'ipt>');</script>
+</body>
+</html>
