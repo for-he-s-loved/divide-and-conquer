@@ -17,7 +17,7 @@ const VIEW_H = 640;
 
 const LEVELS = [
   {
-    name: 'Round 1 · Warmup Plains',
+    name: 'Round 1 · Greenwood · Bramble Warden',
     tile: 40,
     theme: {
       floor: 0x1f3a2c, floorAlt: 0x254432, grid: 0x2d5a40,
@@ -26,40 +26,66 @@ const LEVELS = [
       ambient: 'leaves', ambientColor: 0x7ee9c1,
       accent: 0x7ee9c1,
     },
-    // 50 cols × 16 rows × 40px = 2000 × 640
+    // 50 cols × 21 rows × 40px = 2000 × 840
     map: [
       '##################################################',
       '#                                                #',
       '#  1                                          2  #',
       '#                                                #',
-      '#                                                #',
       '#       a                                b       #',
       '#                                                #',
       '###################### ###########################',
       '#                                                #',
-      '#                                                #',
       '#       c                                d       #',
       '#                                                #',
-      '#                                                #',
       '############ #####################################',
+      '#                                                #',
+      '#################          #######################',
+      '#                                                #',
+      '#                                                #',
+      '#                                                #',
+      '#                                                #',
+      '#                                                #',
+      '#                                                #',
       '#                                              F #',
       '##################################################',
     ],
     plates: {
-      a: {x: 8, y: 5, who: 'p1', gate: 1},
-      b: {x: 41, y: 5, who: 'p2', gate: 1},
-      c: {x: 8, y: 10, who: 'p1', gate: 2},
-      d: {x: 41, y: 10, who: 'p2', gate: 2},
+      a: {x: 8, y: 4, who: 'p1', gate: 1},
+      b: {x: 41, y: 4, who: 'p2', gate: 1},
+      c: {x: 8, y: 8, who: 'p1', gate: 2},
+      d: {x: 41, y: 8, who: 'p2', gate: 2},
     },
-    gates: [{ id: 1, door: {x: 22, y: 7} }, { id: 2, door: {x: 12, y: 13} }],
+    gates: [{ id: 1, door: {x: 22, y: 6} }, { id: 2, door: {x: 12, y: 10} }],
     spawns: { 1: {x: 3, y: 2}, 2: {x: 46, y: 2} },
-    finish: {x: 47, y: 14},
+    finish: {x: 47, y: 19},
     guards: [],
     questionRange: { min: 3, max: 6 },
     timed: false,
+    boss: {
+      name: 'THE BRAMBLE WARDEN',
+      subtitle: 'Vines stir in the underbrush…',
+      visual: 'warden',
+      arenaYMin: 13,
+      spawn: { x: 24, y: 16 },
+      hp: 5,
+      attackInterval: 5500,
+      telegraphMs: 1500,
+      damageMs: 600,
+      damageRadius: 68,
+      playerHp: 5,
+      padCooldownMs: 1200,
+      colors: { aura: 0x7ee9c1, aura2: 0xbef264, eye: 0xfacc15, accent: 0x86efac },
+      pads: {
+        n: { x: 24, y: 14 },
+        e: { x: 30, y: 16 },
+        s: { x: 24, y: 18 },
+        w: { x: 18, y: 16 },
+      },
+    },
   },
   {
-    name: 'Round 2 · Shadow Library · Boss',
+    name: 'Round 2 · Shadow Library · The Librarian',
     tile: 36,
     theme: {
       floor: 0x1a1a2e, floorAlt: 0x252040, grid: 0x3b2858,
@@ -102,6 +128,7 @@ const LEVELS = [
     boss: {
       name: 'THE LIBRARIAN',
       subtitle: 'The forbidden tome awakens…',
+      visual: 'librarian',
       arenaYMin: 8,
       spawn: { x: 30, y: 13 },        // tile coords (center of arena)
       hp: 8,
@@ -111,6 +138,7 @@ const LEVELS = [
       damageRadius: 75,
       playerHp: 4,
       padCooldownMs: 1600,
+      colors: { aura: 0xa78bfa, aura2: 0xc4b5fd, eye: 0xef4444, accent: 0xc4b5fd },
       // 4 pads in a ring around the boss — anyone can use any pad.
       pads: {
         n: { x: 30, y: 10 },
@@ -121,7 +149,7 @@ const LEVELS = [
     },
   },
   {
-    name: 'Round 3 · Crimson Vault',
+    name: 'Round 3 · Crimson Vault · The Lich',
     tile: 32,
     theme: {
       floor: 0x2a1010, floorAlt: 0x3a1818, grid: 0x553030,
@@ -130,7 +158,7 @@ const LEVELS = [
       ambient: 'embers', ambientColor: 0xf97316,
       accent: 0xf87171,
     },
-    // 72 cols × 20 rows × 32px = 2304 × 640
+    // 72 cols × 27 rows × 32px = 2304 × 864
     map: [
       '########################################################################',
       '#                                                                      #',
@@ -150,6 +178,13 @@ const LEVELS = [
       '#                                                                      #',
       '################################################## #####################',
       '#                                                                      #',
+      '#                                                                      #',
+      '#############################          #################################',
+      '#                                                                      #',
+      '#                                                                      #',
+      '#                                                                      #',
+      '#                                                                      #',
+      '#                                                                      #',
       '#                                                                    F #',
       '########################################################################',
     ],
@@ -167,7 +202,7 @@ const LEVELS = [
       { id: 3, door: {x: 50, y: 16} },
     ],
     spawns: { 1: {x: 3, y: 2}, 2: {x: 68, y: 2} },
-    finish: {x: 69, y: 18},
+    finish: {x: 69, y: 25},
     guards: [
       { y: 7, minX: 4, maxX: 68, period: 6500 },
       { y: 12, minX: 4, maxX: 68, period: 5500 },
@@ -178,7 +213,28 @@ const LEVELS = [
     key: {
       spawn: {x: 3, y: 3},
       handoff: {x: 35, y: 9},
-      lock: {x: 69, y: 18},
+      lock: {x: 69, y: 25},
+    },
+    boss: {
+      name: 'THE CRIMSON LICH',
+      subtitle: 'You should not have come this far…',
+      visual: 'lich',
+      arenaYMin: 20,
+      spawn: { x: 36, y: 22 },
+      hp: 12,
+      attackInterval: 3500,
+      telegraphMs: 800,
+      damageMs: 700,
+      damageRadius: 82,
+      playerHp: 3,
+      padCooldownMs: 2000,
+      colors: { aura: 0xef4444, aura2: 0xf97316, eye: 0xfde047, accent: 0xfca5a5 },
+      pads: {
+        n: { x: 36, y: 20 },
+        e: { x: 42, y: 22 },
+        s: { x: 36, y: 24 },
+        w: { x: 30, y: 22 },
+      },
     },
   },
 ];
@@ -810,39 +866,91 @@ const Game = {
     const bx = cfg.spawn.x * T + T/2;
     const by = cfg.spawn.y * T + T/2;
 
+    const C = cfg.colors || { aura: 0xa78bfa, aura2: 0xc4b5fd, eye: 0xef4444, accent: 0xc4b5fd };
     const container = scene.add.container(bx, by);
     container.setDepth(14);
     container.setScale(0); // start hidden — intro tweens up
 
     // Aura
-    const aura = scene.add.circle(0, 0, 60, 0xa78bfa, 0.18);
-    const aura2 = scene.add.circle(0, 0, 44, 0xc4b5fd, 0.25);
-    // Body — a floating tome with a single glowing eye
+    const aura = scene.add.circle(0, 0, 60, C.aura, 0.18);
+    const aura2 = scene.add.circle(0, 0, 44, C.aura2, 0.25);
     const bodyShadow = scene.add.ellipse(0, 38, 80, 14, 0x000000, 0.5);
-    const book = scene.add.graphics();
-    book.fillStyle(0x2d1f44, 1);
-    book.fillRoundedRect(-32, -28, 64, 56, 6);
-    book.lineStyle(3, 0xa78bfa, 0.9);
-    book.strokeRoundedRect(-32, -28, 64, 56, 6);
-    book.fillStyle(0x1a1430, 1);
-    book.fillRect(-4, -28, 8, 56);
-    book.lineStyle(1.5, 0x5b3d7d, 0.8);
-    book.strokeRect(-4, -28, 8, 56);
-    // Decorative runes
-    book.lineStyle(2, 0xc4b5fd, 0.6);
-    book.beginPath();
-    book.moveTo(-22, -14); book.lineTo(-12, -14);
-    book.moveTo(-22, 14);  book.lineTo(-12, 14);
-    book.moveTo(12, -14);  book.lineTo(22, -14);
-    book.moveTo(12, 14);   book.lineTo(22, 14);
-    book.strokePath();
-    // Single eye in center
-    const eyeWhite = scene.add.circle(0, 0, 9, 0xfef3c7, 1);
-    const eyeIris = scene.add.circle(0, 0, 6, 0xef4444, 1);
-    const eyePupil = scene.add.circle(0, 0, 3, 0x000000, 1);
-    const eyeGlow = scene.add.circle(0, 0, 14, 0xef4444, 0.4);
 
-    container.add([aura, aura2, bodyShadow, book, eyeGlow, eyeWhite, eyeIris, eyePupil]);
+    const body = scene.add.graphics();
+    const variant = cfg.visual || 'librarian';
+    if (variant === 'warden') {
+      // Thorny bramble mass — overlapping dark green blobs with spikes
+      body.fillStyle(0x14532d, 1);
+      body.fillCircle(0, 0, 30);
+      body.fillCircle(-18, -8, 16);
+      body.fillCircle(18, -6, 17);
+      body.fillCircle(-10, 16, 14);
+      body.fillCircle(12, 18, 13);
+      body.lineStyle(3, C.aura, 0.85);
+      body.strokeCircle(0, 0, 30);
+      body.fillStyle(0x166534, 1);
+      // Thorns (triangles around silhouette)
+      const thorns = [[0,-34],[-20,-22],[22,-22],[-32,-4],[32,-4],[-22,22],[22,22],[0,32]];
+      for (const [tx, ty] of thorns) {
+        const ang = Math.atan2(ty, tx);
+        const dx = Math.cos(ang), dy = Math.sin(ang);
+        body.fillTriangle(tx, ty, tx - dy * 4, ty + dx * 4, tx + dx * 7, ty + dy * 7);
+      }
+      body.lineStyle(2, 0x86efac, 0.6);
+      body.strokeCircle(-14, -4, 5);
+      body.strokeCircle(13, -2, 5);
+    } else if (variant === 'lich') {
+      // Skull — pale dome with hollow eyes (single big central eye glows)
+      body.fillStyle(0xfaf5e6, 1);
+      body.fillRoundedRect(-30, -32, 60, 50, 22);
+      body.fillRect(-22, 12, 44, 14);
+      // Jaw teeth
+      body.fillStyle(0xfaf5e6, 1);
+      for (let i = -18; i <= 14; i += 8) body.fillRect(i, 22, 5, 8);
+      body.lineStyle(3, C.aura, 0.95);
+      body.strokeRoundedRect(-30, -32, 60, 50, 22);
+      // Cracks
+      body.lineStyle(1.5, 0x991b1b, 0.7);
+      body.beginPath();
+      body.moveTo(-14, -28); body.lineTo(-8, -18); body.lineTo(-16, -10);
+      body.moveTo(18, -24); body.lineTo(12, -14);
+      body.strokePath();
+      // Side eye sockets (hollow black)
+      body.fillStyle(0x1a0606, 1);
+      body.fillCircle(-14, -8, 6);
+      body.fillCircle(14, -8, 6);
+      // Crown spikes
+      body.fillStyle(C.aura, 1);
+      body.fillTriangle(-22, -32, -16, -44, -10, -32);
+      body.fillTriangle(-6, -32, 0, -48, 6, -32);
+      body.fillTriangle(10, -32, 16, -44, 22, -32);
+    } else {
+      // Librarian (default) — floating tome with runes
+      body.fillStyle(0x2d1f44, 1);
+      body.fillRoundedRect(-32, -28, 64, 56, 6);
+      body.lineStyle(3, C.aura, 0.9);
+      body.strokeRoundedRect(-32, -28, 64, 56, 6);
+      body.fillStyle(0x1a1430, 1);
+      body.fillRect(-4, -28, 8, 56);
+      body.lineStyle(1.5, 0x5b3d7d, 0.8);
+      body.strokeRect(-4, -28, 8, 56);
+      body.lineStyle(2, C.accent, 0.6);
+      body.beginPath();
+      body.moveTo(-22, -14); body.lineTo(-12, -14);
+      body.moveTo(-22, 14);  body.lineTo(-12, 14);
+      body.moveTo(12, -14);  body.lineTo(22, -14);
+      body.moveTo(12, 14);   body.lineTo(22, 14);
+      body.strokePath();
+    }
+
+    // Single central eye — same across variants
+    const eyeY = variant === 'lich' ? 0 : 0;
+    const eyeWhite = scene.add.circle(0, eyeY, 9, 0xfef3c7, 1);
+    const eyeIris = scene.add.circle(0, eyeY, 6, C.eye, 1);
+    const eyePupil = scene.add.circle(0, eyeY, 3, 0x000000, 1);
+    const eyeGlow = scene.add.circle(0, eyeY, 14, C.eye, 0.4);
+
+    container.add([aura, aura2, bodyShadow, body, eyeGlow, eyeWhite, eyeIris, eyePupil]);
 
     // Floating bob + aura pulse
     scene.tweens.add({ targets: container, y: by - 8, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
@@ -940,22 +1048,33 @@ const Game = {
     this.bossPhase = 'intro';
     const scene = this.scene;
     const b = this.boss;
+    const C = (this.level.boss.colors) || { aura: 0xa78bfa, aura2: 0xc4b5fd, eye: 0xef4444, accent: 0xc4b5fd };
 
     // Lock both players
-    this.bossIntroLockUntil = (startedAt || performance.now()) + 3600;
+    this.bossIntroLockUntil = (startedAt || performance.now()) + 3800;
     this.me.body.body.setVelocity(0, 0);
 
     // Camera dramatics — stop follow, pan to boss, slight zoom
     scene.cameras.main.stopFollow();
     scene.cameras.main.pan(b.worldX, b.worldY - 20, 800, 'Sine.easeInOut');
-    scene.cameras.main.zoomTo(1.25, 800, 'Sine.easeInOut');
+    scene.cameras.main.zoomTo(1.3, 800, 'Sine.easeInOut');
+
+    // Gentle tremor before boss rises — builds tension
+    scene.cameras.main.shake(700, 0.004);
 
     // Dim overlay (screen-anchored)
     const dim = scene.add.rectangle(0, 0, VIEW_W, VIEW_H, 0x000000, 0).setOrigin(0, 0);
     dim.setScrollFactor(0);
     dim.setDepth(70);
     if (this.minimap) this.minimap.ignore(dim);
-    scene.tweens.add({ targets: dim, alpha: 0.55, duration: 600 });
+    scene.tweens.add({ targets: dim, alpha: 0.6, duration: 600 });
+
+    // Vignette tint pulse (boss color washes over screen)
+    const tint = scene.add.rectangle(0, 0, VIEW_W, VIEW_H, C.aura, 0).setOrigin(0, 0);
+    tint.setScrollFactor(0); tint.setDepth(71); tint.setBlendMode('ADD');
+    if (this.minimap) this.minimap.ignore(tint);
+    scene.tweens.add({ targets: tint, alpha: 0.18, duration: 500, yoyo: true, repeat: 2,
+      onComplete: () => tint.destroy() });
 
     // Letterbox bars
     const barH = 60;
@@ -967,11 +1086,58 @@ const Game = {
     scene.tweens.add({ targets: barTop, y: 0, duration: 500, ease: 'Cubic.easeOut' });
     scene.tweens.add({ targets: barBot, y: VIEW_H - barH, duration: 500, ease: 'Cubic.easeOut' });
 
-    // Boss rises from floor (scale tween + slight overshoot)
+    // Lightning bolts striking from off-screen down to boss (3 staggered)
+    for (let i = 0; i < 3; i++) {
+      scene.time.delayedCall(420 + i * 180, () => {
+        const sx = b.worldX + (Math.random() - 0.5) * 280;
+        const sy = b.worldY - 320;
+        this._drawLightning(scene, sx, sy, b.worldX, b.worldY - 28, C.aura);
+        scene.cameras.main.flash(70, 240, 240, 255, false);
+      });
+    }
+
+    // Radial shockwave from boss center, expanding fast
+    scene.time.delayedCall(700, () => {
+      const sw = scene.add.circle(b.worldX, b.worldY, 14, 0xffffff, 0);
+      sw.setStrokeStyle(6, C.eye, 0.95);
+      sw.setDepth(74);
+      scene.tweens.add({
+        targets: sw, scale: { from: 0.3, to: 18 }, alpha: { from: 1, to: 0 },
+        duration: 1100, ease: 'Cubic.easeOut',
+        onComplete: () => sw.destroy(),
+      });
+      const sw2 = scene.add.circle(b.worldX, b.worldY, 14, 0xffffff, 0);
+      sw2.setStrokeStyle(3, C.aura, 0.7);
+      sw2.setDepth(73);
+      scene.tweens.add({
+        targets: sw2, scale: { from: 0.3, to: 26 }, alpha: { from: 0.8, to: 0 },
+        duration: 1400, delay: 150, ease: 'Cubic.easeOut',
+        onComplete: () => sw2.destroy(),
+      });
+    });
+
+    // Particle eruption at boss feet
+    scene.time.delayedCall(550, () => {
+      const eruption = scene.add.particles(b.worldX, b.worldY + 30, 'spark', {
+        speed: { min: 90, max: 240 },
+        scale: { start: 1.7, end: 0 },
+        alpha: { start: 1, end: 0 },
+        tint: [C.aura, C.eye, C.aura2],
+        lifespan: 900,
+        quantity: 36,
+        blendMode: 'ADD',
+        emitting: false,
+      });
+      eruption.setDepth(75);
+      eruption.explode(36);
+      scene.time.delayedCall(1100, () => eruption.destroy());
+    });
+
+    // Boss rises from floor with overshoot + spin
     scene.tweens.add({
-      targets: b.container, scale: { from: 0, to: 1.08 },
-      duration: 700, delay: 400, ease: 'Back.easeOut',
-      onComplete: () => scene.tweens.add({ targets: b.container, scale: 1, duration: 250, ease: 'Sine.easeInOut' }),
+      targets: b.container, scale: { from: 0, to: 1.18 }, angle: { from: -25, to: 0 },
+      duration: 850, delay: 500, ease: 'Back.easeOut',
+      onComplete: () => scene.tweens.add({ targets: b.container, scale: 1, duration: 280, ease: 'Sine.easeInOut' }),
     });
 
     // Name banner
@@ -994,31 +1160,44 @@ const Game = {
     subtitle.setAlpha(0);
     if (this.minimap) this.minimap.ignore(subtitle);
 
-    scene.tweens.add({ targets: name, alpha: 1, scale: 1, duration: 500, delay: 900, ease: 'Back.easeOut' });
-    scene.tweens.add({ targets: subtitle, alpha: 1, duration: 400, delay: 1300 });
+    scene.tweens.add({ targets: name, alpha: 1, scale: 1, duration: 500, delay: 1000, ease: 'Back.easeOut' });
+    scene.tweens.add({ targets: subtitle, alpha: 1, duration: 400, delay: 1400 });
 
-    // Music + roar
+    // Sequential color flashes painted in the boss palette
+    scene.time.delayedCall(900, () => {
+      const rgb = this._hexToRGB(C.aura);
+      scene.cameras.main.flash(150, rgb[0], rgb[1], rgb[2], false);
+    });
+    scene.time.delayedCall(1300, () => {
+      const rgb = this._hexToRGB(C.eye);
+      scene.cameras.main.flash(120, rgb[0], rgb[1], rgb[2], false);
+    });
+
+    // Swap to boss music + dramatic stinger
     this.bossStinger();
+    if (typeof Music !== 'undefined' && Music.enabled && !Music.muted) {
+      try { Music.playBossTrack(this.currentLevelIdx); } catch (e) {}
+    }
 
     // "FIGHT!" flash + camera shake
-    scene.time.delayedCall(2400, () => {
+    scene.time.delayedCall(2500, () => {
       const fight = scene.add.text(VIEW_W / 2, VIEW_H / 2, 'FIGHT!', {
         fontFamily: 'Space Grotesk, sans-serif',
-        fontSize: '110px', fontStyle: 'bold',
-        color: '#fbbf24', stroke: '#1a0a0a', strokeThickness: 10,
+        fontSize: '130px', fontStyle: 'bold',
+        color: '#fbbf24', stroke: '#1a0a0a', strokeThickness: 12,
       }).setOrigin(0.5);
       fight.setScrollFactor(0); fight.setDepth(95);
       fight.setScale(0.3); fight.setAlpha(0);
       if (this.minimap) this.minimap.ignore(fight);
-      scene.tweens.add({ targets: fight, scale: 1.15, alpha: 1, duration: 280, ease: 'Back.easeOut' });
-      scene.tweens.add({ targets: fight, alpha: 0, scale: 1.4, duration: 500, delay: 600, onComplete: () => fight.destroy() });
-      scene.cameras.main.shake(380, 0.014);
-      scene.cameras.main.flash(220, 251, 191, 36, false);
+      scene.tweens.add({ targets: fight, scale: 1.2, alpha: 1, duration: 280, ease: 'Back.easeOut' });
+      scene.tweens.add({ targets: fight, alpha: 0, scale: 1.55, duration: 500, delay: 700, onComplete: () => fight.destroy() });
+      scene.cameras.main.shake(520, 0.02);
+      scene.cameras.main.flash(280, 251, 191, 36, false);
       this.bossRoar();
     });
 
     // Release: tween out everything, resume follow, start fight
-    scene.time.delayedCall(3400, () => {
+    scene.time.delayedCall(3600, () => {
       scene.tweens.add({ targets: [dim, name, subtitle], alpha: 0, duration: 400, onComplete: () => {
         dim.destroy(); name.destroy(); subtitle.destroy();
       }});
@@ -1050,6 +1229,39 @@ const Game = {
     const ratio = Math.max(0, this.boss.hp / this.level.boss.hp);
     const targetW = Math.max(0, (this.boss.hpBarW - 4) * ratio);
     this.scene.tweens.add({ targets: this.boss.hpFill, width: targetW, duration: 280, ease: 'Cubic.easeOut' });
+  },
+
+  _drawLightning(scene, x1, y1, x2, y2, glowColor) {
+    const segments = 9;
+    const g = scene.add.graphics();
+    g.setDepth(73);
+    // Outer glow stroke
+    g.lineStyle(7, glowColor || 0xa78bfa, 0.55);
+    g.beginPath();
+    g.moveTo(x1, y1);
+    const points = [];
+    for (let i = 1; i <= segments; i++) {
+      const t = i / segments;
+      const px = x1 + (x2 - x1) * t + (Math.random() - 0.5) * 36;
+      const py = y1 + (y2 - y1) * t + (Math.random() - 0.5) * 14;
+      points.push([px, py]);
+      g.lineTo(px, py);
+    }
+    g.strokePath();
+    // Inner bright core
+    g.lineStyle(2.5, 0xffffff, 1);
+    g.beginPath();
+    g.moveTo(x1, y1);
+    for (const [px, py] of points) g.lineTo(px, py);
+    g.strokePath();
+    scene.tweens.add({
+      targets: g, alpha: 0, duration: 320,
+      onComplete: () => g.destroy(),
+    });
+  },
+
+  _hexToRGB(hex) {
+    return [(hex >> 16) & 0xff, (hex >> 8) & 0xff, hex & 0xff];
   },
 
   bossStinger() {
@@ -1557,6 +1769,13 @@ const Game = {
     scene.cameras.main.shake(700, 0.022);
     scene.cameras.main.flash(500, 255, 255, 200, false);
     this.bossDeathSound();
+
+    // Restore regular track for this round after the death sound winds down
+    if (typeof Music !== 'undefined' && Music.enabled && !Music.muted) {
+      scene.time.delayedCall(1400, () => {
+        try { Music.playTrack(this.currentLevelIdx); } catch (e) {}
+      });
+    }
 
     // Hide HP bar
     scene.tweens.add({ targets: [b.hpBg, b.hpFill, b.hpLabel], alpha: 0, duration: 600 });

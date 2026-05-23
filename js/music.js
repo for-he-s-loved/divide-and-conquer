@@ -11,6 +11,7 @@ const Music = {
   _nextNoteTime: 0,
   _step: 0,
   _trackIdx: 0,
+  _isBoss: false,
 
   // Tracks: { tempo (bpm of 16ths), melody: [midi|null], bass: [midi|null], pattern length = 16 }
   tracks: [
@@ -36,6 +37,34 @@ const Music = {
       melody: [76, 79, 83, 79, 76, 79, 83, 86, 88, 86, 83, 79, 76, 79, 76, 74],
       bass:   [40, 40, 47, 47, 43, 43, 38, 38, 40, 40, 47, 47, 45, 45, 43, 43],
       melodyType: 'square',
+      bassType: 'sawtooth',
+    },
+  ],
+
+  // Boss tracks — heavier, darker, faster than their regular counterparts.
+  bossTracks: [
+    // Round 1 boss · BRAMBLE WARDEN — D minor, ominous slow march
+    {
+      tempo: 460,
+      melody: [62, 65, 69, 65, 62, 65, 69, 72, 70, 67, 65, 62, 65, 62, 60, 58],
+      bass:   [38, 38, 38, null, 41, 41, 41, null, 43, 43, 43, null, 36, 36, 36, null],
+      melodyType: 'square',
+      bassType: 'sawtooth',
+    },
+    // Round 2 boss · LIBRARIAN — A minor low, chromatic creep
+    {
+      tempo: 500,
+      melody: [57, 60, 64, 67, 64, 60, 57, 60, 64, 67, 70, 67, 64, 60, 57, 55],
+      bass:   [33, 33, 36, 36, 40, 40, 33, 33, 33, 33, 36, 36, 40, 40, 33, 33],
+      melodyType: 'square',
+      bassType: 'sawtooth',
+    },
+    // Round 3 boss · CRIMSON LICH — C minor, blistering fast
+    {
+      tempo: 620,
+      melody: [60, 63, 67, 72, 67, 63, 60, 63, 67, 72, 75, 72, 67, 63, 60, 58],
+      bass:   [36, 36, 39, 39, 41, 41, 36, 36, 36, 36, 39, 39, 41, 41, 36, 36],
+      melodyType: 'sawtooth',
       bassType: 'sawtooth',
     },
   ],
@@ -71,7 +100,19 @@ const Music = {
   playTrack(idx) {
     if (!this._ensure()) return;
     this._trackIdx = idx;
+    this._isBoss = false;
     this.currentTrack = this.tracks[idx % this.tracks.length];
+    this._step = 0;
+    this._nextNoteTime = this.ctx.currentTime + 0.06;
+    if (this._timer) clearInterval(this._timer);
+    this._timer = setInterval(() => this._scheduler(), 30);
+  },
+
+  playBossTrack(idx) {
+    if (!this._ensure()) return;
+    this._trackIdx = idx;
+    this._isBoss = true;
+    this.currentTrack = this.bossTracks[idx % this.bossTracks.length];
     this._step = 0;
     this._nextNoteTime = this.ctx.currentTime + 0.06;
     if (this._timer) clearInterval(this._timer);
