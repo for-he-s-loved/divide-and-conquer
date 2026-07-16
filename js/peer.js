@@ -41,6 +41,10 @@ const Net = {
   _outbox: [],
   _reconnectTimer: null,
   _reconnectAttempts: 0,
+  // When the relay restarts (e.g. a redeploy) it loses all rooms. On
+  // 'no-room' during a mid-game reconnect the host re-creates the room under
+  // the same code and the joiner keeps retrying 'join' until it exists again.
+  _recoverMode: null, // null | 'rehost' | 'rejoin-as-join'
 
   _log(msg) {
     console.log('[Net]', msg);
@@ -77,13 +81,14 @@ const Net = {
 
   _scheduleReconnect() {
     if (this._reconnectTimer || !this.roomCode || !this.playerId) return;
-    if (this._reconnectAttempts >= 8) {
-      this._log('Gave up reconnecting after 8 attempts.');
+    if (this._reconnectAttempts >= 30) {
+      this._log('Gave up reconnecting after 30 attempts.');
+      try { if (typeof App !== 'undefined' && App.chatSystem) App.chatSystem('⚠ Lost the relay connection and could not recover. Both players should refresh and start a new room.'); } catch (_) {}
       return;
     }
     const delay = Math.min(8000, 500 * Math.pow(2, this._reconnectAttempts));
     this._reconnectAttempts++;
-    this._log(`Reconnecting in ${(delay / 1000).toFixed(1)}s… (attempt ${this._reconnectAttempts}/8)`);
+    this._log(`Reconnecting in ${(delay / 1000).toFixed(1)}s… (attempt ${this._reconnectAttempts}/30)`);
     this._reconnectTimer = setTimeout(() => {
       this._reconnectTimer = null;
       this._rejoin();
@@ -94,7 +99,11 @@ const Net = {
     const code = this.roomCode;
     if (!code) return;
     const ws = this._connect();
-    const go = () => this._send({ type: 'rejoin', code, role: this.isHost ? 'host' : 'joiner' });
+    const go = () => {
+      if (this._recoverMode === 'rehost') this._send({ type: 'host', code });
+      else if (this._recoverMode === 'rejoin-as-join') this._send({ type: 'join', code });
+      else this._send({ type: 'rejoin', code, role: this.isHost ? 'host' : 'joiner' });
+    };
     if (ws.readyState === 1) go();
     else ws.addEventListener('open', go, { once: true });
   },
@@ -104,6 +113,16 @@ const Net = {
     const q = this._outbox.splice(0);
     for (const m of q) this._send({ type: 'data', payload: m });
     if (q.length) this._log(`Flushed ${q.length} queued message(s).`);
+  },
+
+  _setConnPill(connected) {
+    try {
+      const conn = document.getElementById('conn-status');
+      if (conn) {
+        conn.textContent = connected ? '● Connected' : '○ Disconnected';
+        conn.className = 'hud-pill ' + (connected ? 'connected' : 'disconnected');
+      }
+    } catch (_) {}
   },
 
   _send(obj) {
@@ -116,31 +135,50 @@ const Net = {
     try { msg = JSON.parse(ev.data); } catch (_) { return; }
 
     if (msg.type === 'hosted') {
-      this._log(`Hosted room ${msg.code}. Waiting for partner…`);
+      const midGameRehost = !this._hostReady && this.playerId;
+      this._log(midGameRehost
+        ? `Room ${msg.code} re-created after relay restart. Waiting for partner to rejoin…`
+        : `Hosted room ${msg.code}. Waiting for partner…`);
       this.roomCode = msg.code;
       this._reconnectAttempts = 0;
+      this._recoverMode = null;
+      if (midGameRehost) {
+        try { if (typeof App !== 'undefined' && App.chatSystem) App.chatSystem('🔌 Relay came back — waiting for partner to reconnect…'); } catch (_) {}
+      }
       if (this._hostReady) { this._hostReady(msg.code); this._hostReady = null; }
+      this._hostError = null; // don't let a stale callback swallow future errors
     } else if (msg.type === 'joined') {
+      const midGameRejoin = !this._joinReady && this.playerId;
       this._log(`Joined room ${msg.code}. Connected ✓`);
       this.roomCode = msg.code;
       this._reconnectAttempts = 0;
+      this._recoverMode = null;
       if (this._connectTimer) { clearTimeout(this._connectTimer); this._connectTimer = null; }
       if (this._joinReady) { this._joinReady(); this._joinReady = null; }
-      if (this.onConnect) this.onConnect();
+      this._joinError = null; // don't let a stale callback swallow future errors
+      if (midGameRejoin) {
+        this._flushOutbox();
+        this._setConnPill(true);
+        try { if (typeof App !== 'undefined' && App.chatSystem) App.chatSystem('🔌 Reconnected to the relay.'); } catch (_) {}
+      } else if (this.onConnect) {
+        this.onConnect();
+      }
     } else if (msg.type === 'partner-joined') {
       this._log(`Partner connected ✓`);
+      this._flushOutbox();
       if (this.onConnect) this.onConnect();
     } else if (msg.type === 'rejoined') {
-      this._log(`Rejoined room ${msg.code} ✓`);
+      this._log(`Rejoined room ${msg.code} ✓${msg.partner ? '' : ' (partner not back yet)'}`);
       this._reconnectAttempts = 0;
-      this._flushOutbox();
+      this._recoverMode = null;
+      if (msg.partner !== false) this._flushOutbox();
+      this._setConnPill(true);
       try {
-        const conn = document.getElementById('conn-status');
-        if (conn) { conn.textContent = '● Connected'; conn.className = 'hud-pill connected'; }
         if (typeof App !== 'undefined' && App.chatSystem) App.chatSystem('🔌 Reconnected to the relay.');
       } catch (_) {}
     } else if (msg.type === 'partner-rejoined') {
       this._log('Partner reconnected ✓');
+      this._flushOutbox();
       try {
         if (typeof App !== 'undefined' && App.chatSystem) App.chatSystem('🔌 Partner reconnected.');
       } catch (_) {}
@@ -151,11 +189,21 @@ const Net = {
       if (this.onPeer) this.onPeer(msg.payload);
     } else if (msg.type === 'error') {
       this._log(`Relay error: ${msg.reason}`);
-      if (msg.reason === 'no-room' && !this._joinError) {
-        // Rejoin failed — the room expired (or the relay doesn't support
-        // rejoin). Stop retrying.
-        this._reconnectAttempts = 99;
-        this._log('Room no longer exists on the relay — cannot rejoin.');
+      if (msg.reason === 'no-room' && !this._joinError && this.playerId) {
+        // Mid-game reconnect found the room gone — the relay restarted and
+        // lost it. Host re-creates the room under the same code; joiner
+        // retries 'join' until the host has done so.
+        this._recoverMode = this.isHost ? 'rehost' : 'rejoin-as-join';
+        this._log(this.isHost
+          ? 'Room lost (relay restarted) — re-creating it under the same code…'
+          : 'Room lost (relay restarted) — waiting for host to re-create it…');
+        this._scheduleReconnect();
+        return;
+      }
+      if ((msg.reason === 'code-taken' || msg.reason === 'room-full') && !this._hostError && !this._joinError && this.playerId) {
+        // Mid-game recovery race (partner's stale socket still holds the
+        // slot, or another pair took the code) — retry shortly.
+        this._scheduleReconnect();
         return;
       }
       if (msg.reason === 'code-taken' && this._hostError) {

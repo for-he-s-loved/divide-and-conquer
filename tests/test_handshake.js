@@ -7,6 +7,13 @@ const fs = require('fs');
 const WS = require('ws');
 
 const GAME_DIR = process.argv[2] || '/tmp/dac';
+const { spawn } = require('child_process');
+let relayProc = null;
+function startRelay() {
+  relayProc = spawn('node', [require('path').join(GAME_DIR, '../dac-peerserver/server.js')], { env: { ...process.env, PORT: '9100' }, stdio: 'inherit' });
+  return new Promise(r => setTimeout(r, 700));
+}
+function stopRelay() { if (relayProc) { relayProc.kill('SIGKILL'); relayProc = null; } }
 const RELAY_URL = 'ws://127.0.0.1:9100';
 const gameSrc = fs.readFileSync(GAME_DIR + '/js/game.js', 'utf8');
 const peerSrc = fs.readFileSync(GAME_DIR + '/js/peer.js', 'utf8')
@@ -64,6 +71,7 @@ function makeClient(name) {
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 (async () => {
+  await startRelay();
   let failures = 0;
   const assert = (cond, msg) => {
     console.log(`  ${cond ? '✓' : '✗ FAIL:'} ${msg}`);
@@ -112,7 +120,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
   await sleep(200);
   vm.runInContext('Game.continueToNextRound()', host); // host waits
   await sleep(300);
-  assert(host.Game.currentLevelIdx === 1, 'host still waiting (message queued on dead socket)');
+  // (reconnect can heal in <1s, so no intermediate 'still waiting' assertion)
 
   // Wait for joiner's auto-reconnect + rejoin + outbox flush + advance
   await sleep(6000);
@@ -145,6 +153,39 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
   await sleep(4000);
   assert(host.Game.currentLevelIdx === 3, `host advanced to level 4 (idx=${host.Game.currentLevelIdx})`);
   assert(join.Game.currentLevelIdx === 3, `joiner advanced to level 4 (idx=${join.Game.currentLevelIdx})`);
+
+  console.log('\nTEST 4: hard level split — pos-based catch-up sync');
+  // Force a split: host jumps ahead silently (as if every control message was lost).
+  vm.runInContext(`
+    Game.currentLevelIdx = 5;
+    Game.level = LEVELS[5];
+    Game.resetState();
+  `, host);
+  // Host's next position broadcast carries lvl:5 — joiner (on 3) must catch up.
+  vm.runInContext(`Net.send({ type: 'pos', x: 100, y: 100, vx: 0, vy: 0, lvl: Game.currentLevelIdx })`, host);
+  await sleep(500);
+  assert(join.Game.currentLevelIdx === 5, `joiner caught up to host level (idx=${join.Game.currentLevelIdx})`);
+
+  console.log('\nTEST 5: relay RESTARTS mid-game (rooms wiped) — full recovery');
+  stopRelay();
+  await sleep(300);
+  await startRelay(); // fresh relay: no rooms in memory
+  await sleep(14000); // clients reconnect: host re-hosts same code, joiner re-joins
+  assert(host.Net.ws && host.Net.ws.readyState === 1, 'host reconnected after relay restart');
+  assert(join.Net.ws && join.Net.ws.readyState === 1, 'joiner reconnected after relay restart');
+  vm.runInContext(`
+    Game.finishedMe = true;
+    Net.send({ type: 'finish', levelIdx: Game.currentLevelIdx });
+    Game.checkRoundComplete();
+  `, host);
+  await sleep(1200);
+  assert(join.Game.roundOver === true, 'joiner sees round over after relay restart');
+  vm.runInContext('Game.continueToNextRound()', host);
+  vm.runInContext('Game.continueToNextRound()', join);
+  await sleep(3000);
+  assert(host.Game.currentLevelIdx === 6, `host advanced (idx=${host.Game.currentLevelIdx})`);
+  assert(join.Game.currentLevelIdx === 6, `joiner advanced (idx=${join.Game.currentLevelIdx})`);
+  stopRelay();
 
   console.log(failures === 0 ? '\nALL TESTS PASSED' : `\n${failures} FAILURE(S)`);
   process.exit(failures === 0 ? 0 : 1);
