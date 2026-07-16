@@ -802,6 +802,12 @@ const Game = {
       this.currentLevelIdx = idx;
       this.level = LEVELS[idx];
       this.resetState();
+      // Null out stale player refs before the async scene.restart(): if update()
+      // fires during the shutdown window, it must bail rather than touch the
+      // destroyed body from the previous level.
+      this.me = null;
+      this.other = null;
+      this.boss = null;
       this.phaserGame.scene.scenes[0].scene.restart();
     } catch (e) {
       console.error('[Game] loadLevel failed:', e);
@@ -889,19 +895,24 @@ const Game = {
       scene.cameras.main.setBackgroundColor(this.level.theme.bg);
     }
 
-    this.makeTextures(scene);
-    this.drawFloor(scene);
-    this.drawWalls(scene);
-    this.makeAmbient(scene);
-    this.drawFinish(scene);
-    this.drawPlates(scene);
-    this.drawGateDoors(scene);
-    this.makeGuards(scene);
-    this.spawnEnemies(scene);
-    this.drawKeySystem(scene);
-    this.drawReviveZone(scene);
-    this.setupBoss(scene);
-    this.setupHeartsHUD(scene);
+    // Isolate each subsystem so one Phaser hiccup (e.g. a particle texture
+    // race on scene.restart()) can't stop the player from being created —
+    // an incomplete create() left `this.me` pointing at the destroyed
+    // previous-scene player and looked like a permanent freeze.
+    const step = (name, fn) => { try { fn(); } catch (e) { console.warn('[Game] create step failed:', name, e); } };
+    step('textures',   () => this.makeTextures(scene));
+    step('floor',      () => this.drawFloor(scene));
+    step('walls',      () => this.drawWalls(scene));
+    step('ambient',    () => this.makeAmbient(scene));
+    step('finish',     () => this.drawFinish(scene));
+    step('plates',     () => this.drawPlates(scene));
+    step('gateDoors',  () => this.drawGateDoors(scene));
+    step('guards',     () => this.makeGuards(scene));
+    step('enemies',    () => this.spawnEnemies(scene));
+    step('key',        () => this.drawKeySystem(scene));
+    step('reviveZone', () => this.drawReviveZone(scene));
+    step('boss',       () => this.setupBoss(scene));
+    step('heartsHUD',  () => this.setupHeartsHUD(scene));
 
     this.me = this.makePlayer(scene, Net.playerId, true);
     this.other = this.makePlayer(scene, Net.playerId === 1 ? 2 : 1, false);
@@ -3297,6 +3308,18 @@ const Game = {
 
   update(time, delta) {
     if (!this.me) return;
+    // Guard against a stale player reference after scene.restart(): if the
+    // Phaser body was torn down, the whole update loop would silently no-op
+    // and the player appears frozen. Kick the scene back into shape.
+    if (!this.me.body || !this.me.body.body || this.me.body.body.destroyed) {
+      if (!this._recoveringFromStale) {
+        this._recoveringFromStale = true;
+        console.warn('[Game] stale player body detected — reloading level', this.currentLevelIdx);
+        try { this.loadLevel(this.currentLevelIdx); } catch (e) { console.error(e); }
+        setTimeout(() => { this._recoveringFromStale = false; }, 2000);
+      }
+      return;
+    }
 
     const speed = 220;
     let vx = 0, vy = 0;
@@ -3934,3 +3957,6 @@ const Game = {
     }
   },
 };
+
+// Expose for browser console debugging (state inspection when things freeze).
+if (typeof window !== 'undefined') window.Game = Game;
