@@ -35,6 +35,13 @@ const Net = {
   _joinError: null,
   _connectTimer: null,
 
+  // Reconnect / message-queue state. Previously a dropped socket silently
+  // discarded every message (finish, ready-next, plate…) with no reconnect,
+  // which deadlocked the round-advance handshake.
+  _outbox: [],
+  _reconnectTimer: null,
+  _reconnectAttempts: 0,
+
   _log(msg) {
     console.log('[Net]', msg);
     try { if (typeof App !== 'undefined' && App.netDiag) App.netDiag(msg); } catch (e) {}
@@ -62,8 +69,41 @@ const Net = {
       this.ws = null;
       if (this._connectTimer) { clearTimeout(this._connectTimer); this._connectTimer = null; }
       if (this.onDisconnect) this.onDisconnect();
+      // Mid-game drop → try to get back into the same room.
+      if (this.roomCode && this.playerId) this._scheduleReconnect();
     });
     return ws;
+  },
+
+  _scheduleReconnect() {
+    if (this._reconnectTimer || !this.roomCode || !this.playerId) return;
+    if (this._reconnectAttempts >= 8) {
+      this._log('Gave up reconnecting after 8 attempts.');
+      return;
+    }
+    const delay = Math.min(8000, 500 * Math.pow(2, this._reconnectAttempts));
+    this._reconnectAttempts++;
+    this._log(`Reconnecting in ${(delay / 1000).toFixed(1)}s… (attempt ${this._reconnectAttempts}/8)`);
+    this._reconnectTimer = setTimeout(() => {
+      this._reconnectTimer = null;
+      this._rejoin();
+    }, delay);
+  },
+
+  _rejoin() {
+    const code = this.roomCode;
+    if (!code) return;
+    const ws = this._connect();
+    const go = () => this._send({ type: 'rejoin', code, role: this.isHost ? 'host' : 'joiner' });
+    if (ws.readyState === 1) go();
+    else ws.addEventListener('open', go, { once: true });
+  },
+
+  _flushOutbox() {
+    if (!this.ws || this.ws.readyState !== 1) return;
+    const q = this._outbox.splice(0);
+    for (const m of q) this._send({ type: 'data', payload: m });
+    if (q.length) this._log(`Flushed ${q.length} queued message(s).`);
   },
 
   _send(obj) {
@@ -78,16 +118,32 @@ const Net = {
     if (msg.type === 'hosted') {
       this._log(`Hosted room ${msg.code}. Waiting for partner…`);
       this.roomCode = msg.code;
+      this._reconnectAttempts = 0;
       if (this._hostReady) { this._hostReady(msg.code); this._hostReady = null; }
     } else if (msg.type === 'joined') {
       this._log(`Joined room ${msg.code}. Connected ✓`);
       this.roomCode = msg.code;
+      this._reconnectAttempts = 0;
       if (this._connectTimer) { clearTimeout(this._connectTimer); this._connectTimer = null; }
       if (this._joinReady) { this._joinReady(); this._joinReady = null; }
       if (this.onConnect) this.onConnect();
     } else if (msg.type === 'partner-joined') {
       this._log(`Partner connected ✓`);
       if (this.onConnect) this.onConnect();
+    } else if (msg.type === 'rejoined') {
+      this._log(`Rejoined room ${msg.code} ✓`);
+      this._reconnectAttempts = 0;
+      this._flushOutbox();
+      try {
+        const conn = document.getElementById('conn-status');
+        if (conn) { conn.textContent = '● Connected'; conn.className = 'hud-pill connected'; }
+        if (typeof App !== 'undefined' && App.chatSystem) App.chatSystem('🔌 Reconnected to the relay.');
+      } catch (_) {}
+    } else if (msg.type === 'partner-rejoined') {
+      this._log('Partner reconnected ✓');
+      try {
+        if (typeof App !== 'undefined' && App.chatSystem) App.chatSystem('🔌 Partner reconnected.');
+      } catch (_) {}
     } else if (msg.type === 'partner-left') {
       this._log(`Partner disconnected`);
       if (this.onDisconnect) this.onDisconnect();
@@ -95,6 +151,13 @@ const Net = {
       if (this.onPeer) this.onPeer(msg.payload);
     } else if (msg.type === 'error') {
       this._log(`Relay error: ${msg.reason}`);
+      if (msg.reason === 'no-room' && !this._joinError) {
+        // Rejoin failed — the room expired (or the relay doesn't support
+        // rejoin). Stop retrying.
+        this._reconnectAttempts = 99;
+        this._log('Room no longer exists on the relay — cannot rejoin.');
+        return;
+      }
       if (msg.reason === 'code-taken' && this._hostError) {
         // Caller will retry with a new code
         this._hostError({ type: 'code-taken' });
@@ -161,7 +224,14 @@ const Net = {
   },
 
   send(msg) {
-    this._send({ type: 'data', payload: msg });
+    if (this.ws && this.ws.readyState === 1) {
+      this._send({ type: 'data', payload: msg });
+    } else if (this.roomCode && this.playerId) {
+      // Socket is down mid-game: queue instead of silently dropping, and
+      // kick off a reconnect. Skip high-frequency position updates.
+      if (msg && msg.type !== 'pos' && this._outbox.length < 200) this._outbox.push(msg);
+      this._scheduleReconnect();
+    }
   },
 
   // Legacy compat — game.js checks Net.conn.open in places

@@ -3877,4 +3877,60 @@ const Game = {
       this.applyEnemyState(msg);
     } else if (msg.type === 'enemy_damage') {
       // Authoritative HP update from host (or peer) for either player
-    
+      const prev = this.playerHp[msg.pid] || 0;
+      this.playerHp[msg.pid] = msg.hp;
+      this.updatePlayerHearts();
+      // If it's about me and I lost HP, apply knockback + feedback locally
+      if (msg.pid === Net.playerId && msg.hp < prev && this.me && this.me.body) {
+        const ang = Math.atan2(msg.ky || 0, msg.kx || 0);
+        this.me.body.x += Math.cos(ang) * 28;
+        this.me.body.y += Math.sin(ang) * 28;
+        this.me.body.body.reset(this.me.body.x, this.me.body.y);
+        this.scene.cameras.main.shake(140, 0.009);
+        this.scene.cameras.main.flash(70, 239, 68, 68, false);
+        SFX.wrong();
+      }
+      if (msg.hp === 0 && prev > 0) this.onPlayerDown(msg.pid);
+    } else if (msg.type === 'enemy_shot') {
+      this.spawnProjectile({ id: msg.id, x: msg.x, y: msg.y, vx: msg.vx, vy: msg.vy, dieAt: performance.now() + (msg.ttl || 1500), color: msg.color });
+    } else if (msg.type === 'enemy_dead') {
+      const e = this.enemies.find(x => x.id === msg.id);
+      if (e) this.killEnemy(e, false);
+    } else if (msg.type === 'revive_request') {
+      // Client asked host to start; host validates and starts
+      if (Net.isHost && !this.reviveBoss && this.someoneDown()) {
+        this.startReviveEncounter();
+        Net.send({ type: 'revive_start' });
+      }
+    } else if (msg.type === 'revive_start') {
+      this.reviveStarted = true;
+      this.startReviveEncounter();
+    } else if (msg.type === 'revive_attack') {
+      this.startReviveAttack({
+        targetPid: msg.targetPid, x: msg.x, y: msg.y,
+        startedAt: performance.now(),
+        telegraphMs: msg.telegraphMs, damageMs: msg.damageMs,
+        damageRadius: msg.damageRadius, phase: 'tele', revive: true,
+      });
+    } else if (msg.type === 'revive_hit') {
+      if (this.reviveBoss && this.reviveBoss.alive) {
+        this.reviveBoss.hp = msg.hp;
+        const ratio = this.reviveBoss.hp / this.reviveBoss.maxHp;
+        this.scene.tweens.add({ targets: this.reviveBoss.hpFill, width: Math.max(0, (this.reviveBoss.hpBarW - 4) * ratio), duration: 250, ease: 'Cubic.easeOut' });
+        this.bossHitSound();
+        this.burst(this.reviveBoss.worldX, this.reviveBoss.worldY, 0xfbbf24, 14);
+        if (this.reviveBoss.hp === 0) this.completeRevive();
+      }
+    } else if (msg.type === 'revive_kill') {
+      // Only relevant if we haven't already killed
+      if (this.reviveBoss && this.reviveBoss.alive) {
+        this.reviveBoss.hp = 0;
+        this.completeRevive();
+      }
+    } else if (msg.type === 'revive_done') {
+      this.revivePlayer(msg.pid);
+    } else if (msg.type === 'overworld_wipe') {
+      this.runOverworldWipe();
+    }
+  },
+};
