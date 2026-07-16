@@ -982,26 +982,30 @@ const Game = {
   },
 
   makeTextures(scene) {
+    // Reuse existing textures across scene.restart() — removing and
+    // regenerating them mid-restart leaves dangling emitter frame refs
+    // and triggers Phaser 3.80.1's "Cannot read properties of null
+    // (reading 'cut')" during the next render tick.
     const tex = scene.textures;
-    if (tex.exists('spark')) tex.remove('spark');
-    if (tex.exists('vision')) tex.remove('vision');
-
-    const g = scene.add.graphics();
-    g.fillStyle(0xffffff, 1);
-    g.fillCircle(4, 4, 4);
-    g.generateTexture('spark', 8, 8);
-    g.destroy();
-
-    const vsz = VISION_RADIUS * 2;
-    const vg = scene.make.graphics({ add: false });
-    const steps = 30;
-    for (let i = 0; i < steps; i++) {
-      const r = (VISION_RADIUS * (steps - i)) / steps;
-      vg.fillStyle(0xffffff, 0.1);
-      vg.fillCircle(VISION_RADIUS, VISION_RADIUS, r);
+    if (!tex.exists('spark')) {
+      const g = scene.add.graphics();
+      g.fillStyle(0xffffff, 1);
+      g.fillCircle(4, 4, 4);
+      g.generateTexture('spark', 8, 8);
+      g.destroy();
     }
-    vg.generateTexture('vision', vsz, vsz);
-    vg.destroy();
+    if (!tex.exists('vision')) {
+      const vsz = VISION_RADIUS * 2;
+      const vg = scene.make.graphics({ add: false });
+      const steps = 30;
+      for (let i = 0; i < steps; i++) {
+        const r = (VISION_RADIUS * (steps - i)) / steps;
+        vg.fillStyle(0xffffff, 0.1);
+        vg.fillCircle(VISION_RADIUS, VISION_RADIUS, r);
+      }
+      vg.generateTexture('vision', vsz, vsz);
+      vg.destroy();
+    }
   },
 
   drawFloor(scene) {
