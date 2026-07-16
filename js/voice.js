@@ -57,6 +57,19 @@ const Voice = {
   _tryConnect() {
     if (!this.myReady || !this.partnerReady || this.call) return;
 
+    // The pair connection now runs over a plain WebSocket relay — PeerJS
+    // isn't initialized for pair play, so Net.peer is null. Voice chat used
+    // to piggyback on PeerJS's call API; without a PeerJS peer we can't
+    // establish the WebRTC media channel, so bail with a friendly note
+    // instead of throwing "Cannot read properties of null (reading 'call')".
+    if (!Net.peer) {
+      if (!this._voiceUnsupportedNoted) {
+        this._voiceUnsupportedNoted = true;
+        try { App.chatSystem('🎤 Voice chat unavailable in this session.'); } catch (_) {}
+      }
+      return;
+    }
+
     if (Net.isHost) {
       if (this._pendingCall) {
         this._pendingCall.answer(this.localStream);
