@@ -3379,27 +3379,39 @@ const Game = {
       this.other.visual.y = this.other.body.y + rbob;
     }
 
-    this.updateGuards(time);
-    this.enemyTick(time);
-    this.updateEnemyVisuals();
-    this.updateProjectiles(time);
-    this.syncEnemyState(time);
-    this.checkReviveZone();
-    this.updateReviveArrow();
-    this.reviveBossTick();
-    this.updateReviveAttacks();
-    this.checkRevivePads();
-    this.updateFog();
-    this.checkPlates();
-    this.checkKey();
+    // Isolate each tick phase — if one throws, downstream phases (especially
+    // syncEnemyState and checkFinish) must still run, otherwise enemies
+    // freeze on the joiner and the finish-line detection silently stops,
+    // which looks like "the game locked up" on both players.
+    const tick = (name, fn) => {
+      try { fn(); }
+      catch (e) {
+        if (!this._tickErrors) this._tickErrors = {};
+        if (!this._tickErrors[name]) { this._tickErrors[name] = 1; console.warn('[Game] tick phase failed:', name, e); }
+        else this._tickErrors[name]++;
+      }
+    };
+    tick('guards',        () => this.updateGuards(time));
+    tick('enemyTick',     () => this.enemyTick(time));
+    tick('enemyVisuals',  () => this.updateEnemyVisuals());
+    tick('projectiles',   () => this.updateProjectiles(time));
+    tick('syncEnemies',   () => this.syncEnemyState(time));
+    tick('reviveZone',    () => this.checkReviveZone());
+    tick('reviveArrow',   () => this.updateReviveArrow());
+    tick('reviveBoss',    () => this.reviveBossTick());
+    tick('reviveAttacks', () => this.updateReviveAttacks());
+    tick('revivePads',    () => this.checkRevivePads());
+    tick('fog',           () => this.updateFog());
+    tick('plates',        () => this.checkPlates());
+    tick('key',           () => this.checkKey());
     if (this.boss) {
-      this.checkBossIntroTrigger();
-      this.bossTick();
-      this.updateBossAttacks();
-      this.checkBossPads();
+      tick('bossIntro',   () => this.checkBossIntroTrigger());
+      tick('bossTick',    () => this.bossTick());
+      tick('bossAttacks', () => this.updateBossAttacks());
+      tick('bossPads',    () => this.checkBossPads());
     }
-    this.checkFinish();
-    if (this.questionTimerActive) this.tickQuestionTimer();
+    tick('finish',        () => this.checkFinish());
+    if (this.questionTimerActive) tick('questionTimer', () => this.tickQuestionTimer());
   },
 
   updateGuards(time) {
@@ -3795,6 +3807,11 @@ const Game = {
   },
 
   handlePeerMessage(msg) {
+    try { this._handlePeerMessage(msg); }
+    catch (e) { console.warn('[Game] handlePeerMessage failed for type:', msg && msg.type, e); }
+  },
+
+  _handlePeerMessage(msg) {
     if (msg.type === 'pos') {
       // Catch-all level sync: enemies and bosses are simulated by the host,
       // so if the pair ever splits across levels (a missed advance message),
