@@ -37,7 +37,7 @@ const Classroom = {
   _tryHostClass(onReady, onError, attempts) {
     if (attempts > 5) { onError && onError('Could not get a free class code. Try again.'); return; }
     const code = Net.randomCode();
-    const peer = new Peer(this._prefix + code, { debug: 1 });
+    const peer = new Peer(this._prefix + code, Net._peerOpts());
     peer.on('open', () => {
       this.peer = peer;
       this.classCode = code;
@@ -109,7 +109,7 @@ const Classroom = {
   joinClass(code, onReady, onError) {
     this.role = 'student';
     this.classCode = code;
-    const peer = new Peer(undefined, { debug: 1 });
+    const peer = new Peer(undefined, Net._peerOpts());
     peer.on('open', () => {
       this.peer = peer;
       const conn = peer.connect(this._prefix + code, { reliable: true });

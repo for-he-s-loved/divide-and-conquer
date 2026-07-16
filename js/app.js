@@ -14,9 +14,13 @@ const App = {
   init() {
     document.getElementById('host-btn').onclick = () => { SFX.click(); this.startHost(); };
     document.getElementById('join-btn').onclick = () => { SFX.click(); this.startJoin(); };
-    document.getElementById('code-input').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') this.startJoin();
-    });
+    const codeInput = document.getElementById('code-input');
+    if (codeInput) {
+      codeInput.addEventListener('input', (e) => { e.target.value = e.target.value.toUpperCase(); });
+      codeInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') this.startJoin(); });
+    }
+    const studentClassInputUpper = document.getElementById('student-class-code');
+    if (studentClassInputUpper) studentClassInputUpper.addEventListener('input', (e) => { e.target.value = e.target.value.toUpperCase(); });
     document.getElementById('copy-code').onclick = () => this.copyCode();
 
     document.getElementById('answer-submit').onclick = () => Game.submitAnswer();
@@ -144,11 +148,22 @@ const App = {
   showRoundComplete(roundNumber) {
     const overlay = document.getElementById('round-complete');
     document.getElementById('round-complete-num').textContent = roundNumber;
-    const titles = ['Nice work!', 'Great teamwork!', 'On a roll!'];
+    const titles = ['Nice work!', 'Great teamwork!', 'On a roll!', 'Unstoppable!', 'Legendary!'];
     document.getElementById('round-complete-title').textContent =
       titles[Math.min(roundNumber - 1, titles.length - 1)];
-    const next = LEVELS && LEVELS[roundNumber] ? LEVELS[roundNumber].name : 'the next round';
+    const nextLevel = LEVELS && LEVELS[roundNumber];
+    const next = nextLevel ? nextLevel.name : 'the next round';
     document.getElementById('round-complete-sub').textContent = `Next up: ${next}`;
+    const diffEl = document.getElementById('round-complete-difficulty');
+    if (diffEl) {
+      const badge = nextLevel && nextLevel.difficultyBadge;
+      if (badge) {
+        diffEl.textContent = 'Difficulty: ' + badge;
+        diffEl.classList.remove('hidden');
+      } else {
+        diffEl.classList.add('hidden');
+      }
+    }
     overlay.classList.remove('hidden');
     this.updateContinueButton();
     SFX.finish();
@@ -259,6 +274,14 @@ const App = {
       () => { this.showPairScreen(code); },
       (err) => { this.setClassStatus(err, true); }
     );
+  },
+
+  netDiag(msg) {
+    const el = document.getElementById('net-diag');
+    if (!el) return;
+    const t = new Date().toLocaleTimeString();
+    el.textContent += `[${t}] ${msg}\n`;
+    el.scrollTop = el.scrollHeight;
   },
 
   savePlayerName(name) {

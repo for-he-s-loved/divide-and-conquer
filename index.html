@@ -107,10 +107,14 @@
       <div class="brand-mark">D&amp;C</div>
     </div>
     <div class="card waiting-card">
-      <h2>Your Room Code</h2>
+      <h2>Your Pair Code</h2>
       <div id="room-code" class="room-code">----</div>
       <button id="copy-code" class="ghost-btn">Copy code</button>
-      <div class="status pulse">Waiting for player 2 to join…</div>
+      <div class="status pulse">Waiting for partner to join…</div>
+      <details class="diag-details">
+        <summary>Connection log</summary>
+        <pre id="net-diag" class="net-diag"></pre>
+      </details>
     </div>
   </div>
 
@@ -206,6 +210,7 @@
       <div id="round-complete-num" class="round-num">1</div>
       <h2 id="round-complete-title">Nice work!</h2>
       <p id="round-complete-sub">Get ready for the next round.</p>
+      <p id="round-complete-difficulty" class="round-difficulty hidden">Difficulty: —</p>
       <div class="round-stats">
         <div class="ready-row">
           <span class="ready-dot" id="ready-me">●</span> You
