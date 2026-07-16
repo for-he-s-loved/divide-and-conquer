@@ -833,6 +833,7 @@ const Game = {
     this.finishedMe = false;
     this.finishedThem = false;
     this.roundOver = false;
+    this._waitingChatShown = false;
     this.stunned = false;
     this.stunUntil = 0;
     this.readyToContinue = false;
@@ -1056,14 +1057,47 @@ const Game = {
     const T = this.tile();
     const t = this.level.finish;
     const cx = t.x * T + T/2, cy = t.y * T + T/2;
-    const glow = scene.add.circle(cx, cy, T * 0.9, PALETTE.finishGlow, 0.3);
-    const ring = scene.add.circle(cx, cy, T/2 - 2, PALETTE.finish, 0);
-    ring.setStrokeStyle(3, PALETTE.finish, 1);
-    const inner = scene.add.circle(cx, cy, T/2 - 10, PALETTE.finishGlow, 0.6);
-    scene.tweens.add({ targets: glow, alpha: 0.55, scale: 1.15, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-    scene.tweens.add({ targets: ring,  scale: 1.2,  duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-    scene.tweens.add({ targets: inner, alpha: 0.2,  duration: 800,  yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-    this.finishVisuals = { glow, ring, inner };
+    // Door frame + door leaves. Locked (boss/key gate) → shows a padlock;
+    // unlocked → padlock fades and door leaves swing open.
+    const frame = scene.add.rectangle(cx, cy, T - 4, T - 4, PALETTE.finishGlow, 0.15);
+    frame.setStrokeStyle(3, PALETTE.finish, 0.9);
+    const arch = scene.add.graphics();
+    arch.lineStyle(3, PALETTE.finish, 0.9);
+    arch.beginPath();
+    arch.arc(cx, cy - T/2 + 4, T/2 - 6, Math.PI, 0);
+    arch.strokePath();
+    const leafL = scene.add.rectangle(cx - T/4 + 2, cy + 2, T/2 - 6, T - 14, PALETTE.finish, 0.55);
+    const leafR = scene.add.rectangle(cx + T/4 - 2, cy + 2, T/2 - 6, T - 14, PALETTE.finish, 0.55);
+    leafL.setOrigin(1, 0.5); leafR.setOrigin(0, 0.5);
+    leafL.setStrokeStyle(2, PALETTE.finishGlow, 0.8);
+    leafR.setStrokeStyle(2, PALETTE.finishGlow, 0.8);
+    const glow = scene.add.circle(cx, cy, T * 0.9, PALETTE.finishGlow, 0);
+    scene.tweens.add({ targets: glow, alpha: 0.35, scale: 1.15, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    const lock = scene.add.text(cx, cy, '🔒', {
+      fontFamily: 'Space Grotesk, sans-serif', fontSize: `${Math.round(T * 0.6)}px`,
+    }).setOrigin(0.5);
+    lock.setDepth(6);
+    frame.setDepth(4); arch.setDepth(5); leafL.setDepth(5); leafR.setDepth(5); glow.setDepth(3);
+    this.finishVisuals = { frame, arch, leafL, leafR, glow, lock, opened: false };
+  },
+
+  openFinishDoor() {
+    const v = this.finishVisuals;
+    if (!v || v.opened) return;
+    v.opened = true;
+    const scene = this.scene;
+    scene.tweens.add({ targets: v.lock, alpha: 0, scale: 0, duration: 300, onComplete: () => v.lock.destroy() });
+    scene.tweens.add({ targets: v.leafL, angle: -85, duration: 550, ease: 'Back.easeOut' });
+    scene.tweens.add({ targets: v.leafR, angle: 85,  duration: 550, ease: 'Back.easeOut' });
+    scene.tweens.add({ targets: v.glow, alpha: 0.55, scale: 1.4, duration: 400, yoyo: false });
+    SFX.gateOpen && SFX.gateOpen();
+  },
+
+  updateFinishDoorState() {
+    if (!this.finishVisuals || this.finishVisuals.opened) return;
+    const keyOK = !this.level.key || this.keyState === 'used';
+    const bossOK = !this.boss || this.bossPhase === 'dead';
+    if (keyOK && bossOK) this.openFinishDoor();
   },
 
   drawPlates(scene) {
@@ -3435,6 +3469,7 @@ const Game = {
       tick('bossAttacks', () => this.updateBossAttacks());
       tick('bossPads',    () => this.checkBossPads());
     }
+    tick('doorState',     () => this.updateFinishDoorState());
     tick('finish',        () => this.checkFinish());
     if (this.questionTimerActive) tick('questionTimer', () => this.tickQuestionTimer());
   },
@@ -3710,7 +3745,7 @@ const Game = {
     if (tx === f.x && ty === f.y) {
       if (this.level.key && this.keyState !== 'used') {
         if (!this._finishLockedNote || performance.now() - this._finishLockedNote > 3000) {
-          App.chatSystem('🔒 Finish is locked — partner needs the key in the lock first.');
+          App.chatSystem('🔒 Door is locked — partner needs the key in the lock first.');
           this._finishLockedNote = performance.now();
           SFX.wrong();
         }
@@ -3726,23 +3761,36 @@ const Game = {
       }
       this.finishedMe = true;
       Net.send({ type: 'finish', levelIdx: this.currentLevelIdx });
-      App.chatSystem(`🏁 Player ${Net.playerId} reached the finish.`);
+      App.chatSystem(`🚪 Player ${Net.playerId} reached the door.`);
       SFX.finish();
       this.burst(this.me.body.x, this.me.body.y, PALETTE.finish, 24);
-      this.checkRoundComplete();
+      this._startFinishSync();
+      this.tryAdvance();
     }
   },
 
-  checkRoundComplete() {
-    if (!(this.finishedMe || this.finishedThem)) return;
-    if (this.roundOver) return; // idempotent — duplicate/resent 'finish' messages are no-ops
-    // Freeze gameplay on both sides — survivor is safe from enemies/guards.
-    this.finishedMe = true;
+  // Legacy alias — the old Continue button in app.js still references this.
+  // No longer used in the flow, but keep it wired so an accidental click can't
+  // throw. It just re-runs the auto-advance check.
+  continueToNextRound() { this.tryAdvance(); },
+
+  // Both players standing at the door → walk through to next round.
+  // No overlay, no Continue button — the door is the transition.
+  tryAdvance() {
+    if (!(this.finishedMe && this.finishedThem)) {
+      if (this.finishedMe && !this.finishedThem && !this._waitingChatShown) {
+        this._waitingChatShown = true;
+        App.chatSystem('⏳ Waiting for partner at the door…');
+      }
+      return;
+    }
+    if (this.roundOver) return;
     this.roundOver = true;
-    this._startRoundSync();
+    this._stopRoundSync();
     this.enemyProjectiles.forEach(p => { try { p.sprite.destroy(); } catch (_) {} });
     this.enemyProjectiles = [];
     if (this.me && this.me.body && this.me.body.body) this.me.body.body.setVelocity(0, 0);
+
     const isLast = this.currentLevelIdx >= LEVELS.length - 1;
     if (isLast) {
       const elapsed = App.stopTimer();
@@ -3751,14 +3799,11 @@ const Game = {
       try {
         if (Net.isHost && Classroom && Classroom.connected && Classroom.connected()) {
           Classroom.sendFinish({
-            pairCode: Net.roomCode,
-            time: elapsed,
-            timeMs,
-            rounds: LEVELS.length,
-            at: Date.now(),
+            pairCode: Net.roomCode, time: elapsed, timeMs,
+            rounds: LEVELS.length, at: Date.now(),
           });
         }
-      } catch (e) { /* no class connection */ }
+      } catch (e) {}
       setTimeout(() => {
         document.getElementById('game-screen').classList.add('hidden');
         document.getElementById('win-screen').classList.remove('hidden');
@@ -3766,43 +3811,24 @@ const Game = {
         App.launchConfetti();
       }, 600);
     } else {
-      setTimeout(() => App.showRoundComplete(this.currentLevelIdx + 1), 700);
-    }
-  },
-
-  continueToNextRound() {
-    this.readyToContinue = true;
-    Net.send({ type: 'ready-next', levelIdx: this.currentLevelIdx });
-    App.updateContinueButton();
-    this.tryAdvance();
-  },
-
-  tryAdvance() {
-    if (this.readyToContinue && this.partnerReadyToContinue) {
       const next = this.currentLevelIdx + 1;
-      // Tell the partner we're advancing — if they missed a 'ready-next',
-      // this pulls them forward instead of leaving them stuck waiting.
       Net.send({ type: 'advance', toLevel: next });
-      App.hideRoundComplete();
-      this.loadLevel(next);
+      // Short "walk through the door" beat, then swap levels.
+      setTimeout(() => this.loadLevel(next), 450);
     }
   },
 
-  // While the round-complete overlay is up, periodically re-send our state.
-  // The relay drops messages if the socket hiccups; without this, one lost
-  // 'finish' or 'ready-next' deadlocks both players on "Waiting for partner…".
-  _startRoundSync() {
+  // Reliably re-broadcast 'finish' — the relay may drop a message; without
+  // resend, one lost packet would leave a partner waiting at the door forever.
+  _startFinishSync() {
     if (this._roundSyncTimer) return;
     const lvl = this.currentLevelIdx;
     this._roundSyncTicks = 0;
     this._roundSyncTimer = setInterval(() => {
-      if (!this.roundOver || this.currentLevelIdx !== lvl) { this._stopRoundSync(); return; }
+      if (this.roundOver || this.currentLevelIdx !== lvl) { this._stopRoundSync(); return; }
       this._roundSyncTicks++;
-      if (!this.finishedThem && this._roundSyncTicks <= 15) {
+      if (this.finishedMe && !this.finishedThem && this._roundSyncTicks <= 20) {
         Net.send({ type: 'finish', levelIdx: lvl });
-      }
-      if (this.readyToContinue && !this.partnerReadyToContinue) {
-        Net.send({ type: 'ready-next', levelIdx: lvl });
       }
     }, 2000);
   },
@@ -3878,9 +3904,9 @@ const Game = {
       }
       if (!this.finishedThem) {
         this.finishedThem = true;
-        App.chatSystem(`🏁 Partner reached the finish.`);
+        App.chatSystem(`🚪 Partner reached the door.`);
       }
-      this.checkRoundComplete();
+      this.tryAdvance();
     } else if (msg.type === 'answering') {
       // Partner started/stopped answering a question — mirror their
       // immunity locally so this side's ghosts also ignore them (only
@@ -3893,13 +3919,10 @@ const Game = {
       const partnerId = Net.playerId === 1 ? 2 : 1;
       this.setSpeaking(partnerId, msg.on);
     } else if (msg.type === 'ready-next') {
-      if (typeof msg.levelIdx === 'number' && msg.levelIdx < this.currentLevelIdx) {
-        // Partner is still on the previous round's overlay (they missed our
-        // messages) — pull them forward to where we are.
-        Net.send({ type: 'advance', toLevel: this.currentLevelIdx });
-      } else {
-        this.partnerReadyToContinue = true;
-        App.updateContinueButton();
+      // Legacy — old clients still using the overlay. Treat as "partner is
+      // at the door", so mixed-version pairs still advance instead of stalling.
+      if (typeof msg.levelIdx === 'number' && msg.levelIdx >= this.currentLevelIdx) {
+        if (!this.finishedThem) this.finishedThem = true;
         this.tryAdvance();
       }
     } else if (msg.type === 'advance') {
