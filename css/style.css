@@ -1732,3 +1732,164 @@ textarea.q-prompt { min-height: 50px; line-height: 1.4; }
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   POLISH LAYER — unified motion tokens, hover feel, focus rings,
+   scrollbar theming. Additive; overrides the earlier declarations
+   with the same specificity thanks to source order.
+   ═══════════════════════════════════════════════════════════════════ */
+:root {
+  --ease-smooth: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-swift:  cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-pop:    cubic-bezier(0.34, 1.35, 0.64, 1);
+  --dur-fast: 0.14s;
+  --dur-med:  0.22s;
+  --dur-slow: 0.35s;
+  --ring: 0 0 0 3px rgba(90, 209, 255, 0.35);
+}
+
+*,
+*::before,
+*::after { -webkit-tap-highlight-color: transparent; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Buttons — smoother press, real focus ring, no ugly outline */
+.big-btn, .ghost-btn, .mic-btn, .music-btn, #answer-submit, #chat-send {
+  transition:
+    transform var(--dur-fast) var(--ease-smooth),
+    background var(--dur-med) var(--ease-smooth),
+    box-shadow var(--dur-med) var(--ease-smooth),
+    border-color var(--dur-med) var(--ease-smooth),
+    color var(--dur-med) var(--ease-smooth);
+  outline: none;
+}
+.big-btn:focus-visible,
+.ghost-btn:focus-visible,
+.mic-btn:focus-visible,
+.music-btn:focus-visible,
+#answer-submit:focus-visible,
+#chat-send:focus-visible { box-shadow: var(--ring); }
+.big-btn:active { transform: translateY(1px) scale(0.985); }
+.big-btn.primary:active { box-shadow: 0 4px 14px rgba(126, 233, 193, 0.28); }
+.big-btn:disabled { transform: none; box-shadow: none; }
+
+/* Cards — subtle lift + soft glow on hover */
+.role-card, .host-card, .join-card, .class-entry-card {
+  transition:
+    transform var(--dur-med) var(--ease-smooth),
+    border-color var(--dur-med) var(--ease-smooth),
+    box-shadow var(--dur-slow) var(--ease-smooth);
+}
+.role-card:hover, .host-card:hover, .join-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(126, 233, 193, 0.28);
+  box-shadow: 0 26px 60px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(126, 233, 193, 0.1);
+}
+
+/* Inputs — unified focus ring, smoother hover */
+input {
+  transition:
+    border-color var(--dur-med) var(--ease-smooth),
+    box-shadow var(--dur-med) var(--ease-smooth),
+    background var(--dur-med) var(--ease-smooth);
+  outline: none;
+}
+input:hover { border-color: rgba(255, 255, 255, 0.16); }
+input:focus, input:focus-visible {
+  border-color: var(--accent-2);
+  box-shadow: var(--ring);
+}
+
+/* HUD pills — feel alive on hover */
+.hud-pill {
+  transition:
+    background var(--dur-med) var(--ease-smooth),
+    border-color var(--dur-med) var(--ease-smooth),
+    color var(--dur-med) var(--ease-smooth);
+}
+.hud-pill:not(.mic-btn):not(.music-btn):hover { background: rgba(255, 255, 255, 0.08); }
+
+/* Overlay — softer fade + gentler pop for the round card */
+.overlay { animation: overlayIn var(--dur-slow) var(--ease-smooth); }
+@keyframes overlayIn {
+  from { opacity: 0; backdrop-filter: blur(0); -webkit-backdrop-filter: blur(0); }
+  to   { opacity: 1; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+}
+.round-card { animation: cardIn 0.42s var(--ease-pop); }
+.modal-card { animation: cardIn 0.42s var(--ease-pop); }
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(14px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+
+/* Ready dot — softer state change, gentle glow when ready */
+.ready-dot {
+  transition:
+    color var(--dur-med) var(--ease-smooth),
+    transform var(--dur-med) var(--ease-pop),
+    text-shadow var(--dur-med) var(--ease-smooth);
+}
+.ready-dot.ready {
+  transform: scale(1.2);
+  text-shadow: 0 0 12px rgba(126, 233, 193, 0.7);
+}
+
+/* Room / class code — subtle live shimmer so it feels rewarding to see */
+.room-code {
+  background-size: 200% 100%;
+  animation: shimmer 6s var(--ease-smooth) infinite;
+}
+@keyframes shimmer {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+
+/* Continue button loading label — soft pulse when disabled+waiting */
+#continue-btn:disabled { animation: waitPulse 1.8s ease-in-out infinite; }
+@keyframes waitPulse {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 0.85; }
+}
+
+/* Scrollbar — dark-theme friendly (WebKit + Firefox) */
+* { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.14) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.10);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.22); background-clip: padding-box; border: 2px solid transparent; }
+
+/* Chat log — smooth message reveal + auto-scroll feel */
+#chat-log > * { animation: chatIn var(--dur-med) var(--ease-smooth); }
+@keyframes chatIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Screen transitions — reuse the existing fadeIn but slightly smoother */
+.screen { animation: fadeIn 0.45s var(--ease-smooth); }
+
+/* Ghost buttons — clearer hover, better contrast */
+.ghost-btn:hover { background: rgba(255, 255, 255, 0.04); }
+.ghost-btn:active { transform: translateY(1px); }
+
+/* Selection color — matches the palette */
+::selection { background: rgba(126, 233, 193, 0.35); color: var(--text); }
+
+/* Brand mark — gentle idle bob so the header doesn't feel static */
+.brand .brand-mark { animation: brandFloat 6s ease-in-out infinite; }
+@keyframes brandFloat {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-3px); }
+}
