@@ -3822,16 +3822,19 @@ const Game = {
         this.loadLevel(msg.lvl);
         return;
       }
+      // Partner refs are nulled during scene.restart() — silently drop
+      // 'pos' updates that land in that window; the next tick has fresh refs.
+      if (!this.other || !this.other.body) return;
       this.other.targetX = msg.x;
       this.other.targetY = msg.y;
       this.other.lastVx = msg.vx || 0;
       this.other.lastVy = msg.vy || 0;
       const lx = (msg.vx || 0) === 0 ? 0 : Math.sign(msg.vx) * 1.3;
       const ly = (msg.vy || 0) === 0 ? 0 : Math.sign(msg.vy) * 1.0;
-      this.other.eyeL.setPosition(-3 + lx, -11 + ly);
-      this.other.eyeR.setPosition( 3 + lx, -11 + ly);
-      this.other.eyeWhiteL.setPosition(-3 + lx * 0.5, -11 + ly * 0.5);
-      this.other.eyeWhiteR.setPosition( 3 + lx * 0.5, -11 + ly * 0.5);
+      if (this.other.eyeL) this.other.eyeL.setPosition(-3 + lx, -11 + ly);
+      if (this.other.eyeR) this.other.eyeR.setPosition( 3 + lx, -11 + ly);
+      if (this.other.eyeWhiteL) this.other.eyeWhiteL.setPosition(-3 + lx * 0.5, -11 + ly * 0.5);
+      if (this.other.eyeWhiteR) this.other.eyeWhiteR.setPosition( 3 + lx * 0.5, -11 + ly * 0.5);
     } else if (msg.type === 'plate') {
       this.markPlateDone(msg.gateId, msg.playerId, false);
     } else if (msg.type === 'chat') {
