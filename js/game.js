@@ -769,9 +769,13 @@ const Game = {
   _enemyId: 0,
   _projId: 0,
 
-  start() {
-    this.currentLevelIdx = 0;
-    this.level = LEVELS[0];
+  start(startIdx) {
+    const devStart = (typeof window !== 'undefined' && Number.isInteger(window.__DEV_START_LEVEL))
+      ? window.__DEV_START_LEVEL : 0;
+    const raw = Number.isInteger(startIdx) ? startIdx : devStart;
+    const idx = Math.max(0, Math.min(LEVELS.length - 1, raw));
+    this.currentLevelIdx = idx;
+    this.level = LEVELS[idx];
     this.resetState();
 
     const config = {
@@ -1448,13 +1452,9 @@ const Game = {
     if (!this.level.boss) { this.boss = null; return; }
     const cfg = this.level.boss;
     const T = this.tile();
-
-    // Hide finish until boss dies
-    if (this.finishVisuals) {
-      this.finishVisuals.glow.setVisible(false);
-      this.finishVisuals.ring.setVisible(false);
-      this.finishVisuals.inner.setVisible(false);
-    }
+    // Door stays visible as a locked door — the padlock + closed leaves are
+    // the "locked" affordance. openFinishDoor() runs it open when the boss
+    // dies, so no need to hide/unhide the finish visuals here.
 
     const bx = cfg.spawn.x * T + T/2;
     const by = cfg.spawn.y * T + T/2;
@@ -3408,23 +3408,14 @@ const Game = {
     this.enemyProjectiles.forEach(p => { try { p.sprite.destroy(); } catch (_) {} });
     this.enemyProjectiles = [];
 
-    // Reveal finish portal
+    // Swing the door open — updateFinishDoorState() also catches this on
+    // its tick, but calling directly gives a snappier reaction beat.
     scene.time.delayedCall(1200, () => {
-      if (this.finishVisuals) {
-        this.finishVisuals.glow.setVisible(true);
-        this.finishVisuals.ring.setVisible(true);
-        this.finishVisuals.inner.setVisible(true);
-        this.finishVisuals.glow.setAlpha(0);
-        this.finishVisuals.ring.setAlpha(0);
-        this.finishVisuals.inner.setAlpha(0);
-        scene.tweens.add({ targets: this.finishVisuals.glow, alpha: 0.55, duration: 600 });
-        scene.tweens.add({ targets: this.finishVisuals.ring, alpha: 1, duration: 600 });
-        scene.tweens.add({ targets: this.finishVisuals.inner, alpha: 0.6, duration: 600 });
-        const f = this.level.finish;
-        const T = this.tile();
-        this.burst(f.x * T + T/2, f.y * T + T/2, 0x7ee9c1, 30);
-        App.chatSystem('🌟 Finish portal opened. One player just needs to reach it!');
-      }
+      this.openFinishDoor();
+      const f = this.level.finish;
+      const T = this.tile();
+      this.burst(f.x * T + T/2, f.y * T + T/2, 0x7ee9c1, 30);
+      App.chatSystem('🚪 The door is open — both of you walk through!');
     });
   },
 
@@ -4006,6 +3997,14 @@ const Game = {
     } else if (msg.type === 'pack') {
       Packs.setSessionPack(msg.pack);
       App.chatSystem(`📚 Pack loaded: ${msg.pack.name}`);
+    } else if (msg.type === 'start-level') {
+      // Host picked a non-zero starting level in the admin panel. Load it on
+      // the joiner's side so both players start on the same round.
+      const target = Math.max(0, Math.min(LEVELS.length - 1, msg.idx | 0));
+      if (target !== this.currentLevelIdx) {
+        App.chatSystem(`🛠 Host jumped to Round ${target + 1}.`);
+        this.loadLevel(target);
+      }
     } else if (msg.type === 'boss_intro_start') {
       this.startBossIntro(msg.at);
     } else if (msg.type === 'boss_attack') {

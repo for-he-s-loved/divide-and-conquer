@@ -339,6 +339,11 @@ const App = {
       const localPack = Packs.getActive();
       Packs.setSessionPack(localPack);
       Net.send({ type: 'pack', pack: localPack });
+      // Dev/admin: if the host picked a starting level, broadcast it so the
+      // joiner switches rounds too. Zero is the default and doesn't need a msg.
+      if (Number.isInteger(window.__DEV_START_LEVEL) && window.__DEV_START_LEVEL > 0) {
+        Net.send({ type: 'start-level', idx: window.__DEV_START_LEVEL });
+      }
     }
 
     // Exchange names

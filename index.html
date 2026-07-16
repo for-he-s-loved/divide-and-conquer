@@ -40,6 +40,13 @@
     </div>
 
     <div class="lobby-foot">Built on free, open web tech — works on any laptop, Chromebook, or tablet.</div>
+
+    <details id="admin-panel" style="max-width:640px;margin:24px auto 0;padding:12px 16px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:10px;color:#cbd5e1;font-size:13px;">
+      <summary style="cursor:pointer;user-select:none;font-weight:600;color:#f1f5f9;">🛠 Dev / Admin — start on a specific round</summary>
+      <p style="margin:10px 0 6px;">Both players must pick the same round (host also broadcasts to joiner):</p>
+      <div id="admin-level-btns" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+      <p id="admin-level-status" style="margin:10px 0 0;color:#93c5fd;font-size:12px;">Starting at Round 1 (default).</p>
+    </details>
   </div>
 
   <div id="class-screen" class="screen hidden">
@@ -314,5 +321,46 @@
   <script>document.write('<scr'+'ipt src="js/voice.js?v='+__BUST+'"></scr'+'ipt>');</script>
   <script>document.write('<scr'+'ipt src="js/game.js?v='+__BUST+'"></scr'+'ipt>');</script>
   <script>document.write('<scr'+'ipt src="js/app.js?v='+__BUST+'"></scr'+'ipt>');</script>
+  <script>
+    // Admin level selector — sets window.__DEV_START_LEVEL used by Game.start().
+    // Host also broadcasts {type:'start-level'} on connect so joiner follows.
+    (function () {
+      const LEVEL_NAMES = ['Greenwood', 'Shadow Library', 'Crimson Vault', 'Frozen Spire', 'Void Citadel'];
+      const KEY = 'dac-dev-start-level';
+      const saved = parseInt(sessionStorage.getItem(KEY) || '0', 10) || 0;
+      window.__DEV_START_LEVEL = saved;
+      const wrap = document.getElementById('admin-level-btns');
+      const status = document.getElementById('admin-level-status');
+      if (!wrap || !status) return;
+      const render = () => {
+        wrap.innerHTML = '';
+        for (let i = 0; i < LEVEL_NAMES.length; i++) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.textContent = `${i + 1}. ${LEVEL_NAMES[i]}`;
+          const active = window.__DEV_START_LEVEL === i;
+          b.style.cssText = `padding:6px 10px;border-radius:6px;border:1px solid ${active ? '#5AA0FF' : 'rgba(255,255,255,0.15)'};background:${active ? 'rgba(90,160,255,0.18)' : 'rgba(255,255,255,0.03)'};color:#e2e8f0;font-size:12px;cursor:pointer;`;
+          b.onclick = () => {
+            window.__DEV_START_LEVEL = i;
+            sessionStorage.setItem(KEY, String(i));
+            status.textContent = i === 0
+              ? 'Starting at Round 1 (default).'
+              : `Starting at Round ${i + 1} — ${LEVEL_NAMES[i]}.`;
+            render();
+          };
+          wrap.appendChild(b);
+        }
+      };
+      render();
+      if (saved > 0) status.textContent = `Starting at Round ${saved + 1} — ${LEVEL_NAMES[saved]}.`;
+      // Console shortcut for mid-game jumps (host only — broadcasts to joiner too).
+      window.jumpToLevel = function (idx) {
+        if (typeof Game === 'undefined' || !Game.phaserGame) { console.warn('Game not started yet'); return; }
+        const target = Math.max(0, Math.min(4, idx | 0));
+        Game.loadLevel(target);
+        try { if (typeof Net !== 'undefined' && Net.isHost) Net.send({ type: 'start-level', idx: target }); } catch (_) {}
+      };
+    })();
+  </script>
 </body>
 </html>
