@@ -1955,7 +1955,59 @@ const Game = {
         // For patrol AI
         minX: (def.minX != null ? def.minX * T : (def.x - 4) * T),
         maxX: (def.maxX != null ? def.maxX * T : (def.x + 4) * T),
+        // Wander state — used when a chase/shooter ghost has no valid target
+        // in range. Prevents them from clumping motionless in one spot.
+        wanderHeading: Math.random() * Math.PI * 2,
+        wanderNextChange: performance.now() + 400 + Math.random() * 800,
       });
+    }
+  },
+
+  // Idle drift so out-of-range ghosts don't clump. Random heading changes
+  // every ~1-2s, gentle spawn-anchoring so they don't wander across the map,
+  // and wall bounces on blocked tiles.
+  _wanderEnemy(e, t, now, dt) {
+    const T = this.tile();
+    // Occasionally pick a new heading.
+    if (now >= (e.wanderNextChange || 0)) {
+      e.wanderHeading = Math.random() * Math.PI * 2;
+      e.wanderNextChange = now + 900 + Math.random() * 1200;
+    }
+    // Gentle pull back toward spawn if we've drifted more than ~5 tiles.
+    const homeX = e.spawnTileX * T + T/2;
+    const homeY = e.spawnTileY * T + T/2;
+    const homeDist = Math.hypot(e.x - homeX, e.y - homeY);
+    if (homeDist > T * 5) {
+      const pullAng = Math.atan2(homeY - e.y, homeX - e.x);
+      // Blend home-pull with wander so it doesn't look robotic.
+      e.wanderHeading = pullAng + (Math.random() - 0.5) * 0.6;
+      e.wanderNextChange = now + 700 + Math.random() * 900;
+    }
+    const speed = t.speed * 0.55;
+    e.x += Math.cos(e.wanderHeading) * speed * dt;
+    e.y += Math.sin(e.wanderHeading) * speed * dt;
+  },
+
+  // Push overlapping ghosts apart so they don't pile up on the same tile.
+  _separateEnemies(dt) {
+    if (!this.enemies || this.enemies.length < 2) return;
+    const R = 22, R2 = R * R;
+    for (let i = 0; i < this.enemies.length; i++) {
+      const a = this.enemies[i];
+      if (!a.alive) continue;
+      for (let j = i + 1; j < this.enemies.length; j++) {
+        const b = this.enemies[j];
+        if (!b.alive) continue;
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 > 0 && d2 < R2) {
+          const d = Math.sqrt(d2) || 0.001;
+          const push = (R - d) * 0.5;
+          const ux = dx / d, uy = dy / d;
+          a.x -= ux * push; a.y -= uy * push;
+          b.x += ux * push; b.y += uy * push;
+        }
+      }
     }
   },
 
@@ -2022,24 +2074,28 @@ const Game = {
           const homeY = e.spawnTileY * T + T/2;
           if (Math.abs(e.y - homeY) > 2) e.y += Math.sign(homeY - e.y) * t.speed * 0.5 * dt;
         }
-      } else if (t.ai === 'chase' && players.length > 0) {
-        let best = players[0], bestD = Infinity;
+      } else if (t.ai === 'chase') {
+        let best = null, bestD = Infinity;
         for (const p of players) {
           const d = Math.hypot(p.x - e.x, p.y - e.y);
           if (d < bestD) { bestD = d; best = p; }
         }
-        if (bestD < 400) {
+        if (best && bestD < 400) {
           const ang = Math.atan2(best.y - e.y, best.x - e.x);
           e.x += Math.cos(ang) * t.speed * dt;
           e.y += Math.sin(ang) * t.speed * dt;
+        } else {
+          // Out of range (or immune players) — wander instead of clumping.
+          this._wanderEnemy(e, t, now, dt);
         }
-      } else if (t.ai === 'shooter' && players.length > 0 && now >= e.fireAt) {
-        let best = players[0], bestD = Infinity;
+      } else if (t.ai === 'shooter') {
+        let best = null, bestD = Infinity;
         for (const p of players) {
           const d = Math.hypot(p.x - e.x, p.y - e.y);
           if (d < bestD) { bestD = d; best = p; }
         }
-        if (bestD <= (t.range || 320)) {
+        const range = t.range || 320;
+        if (best && bestD <= range && now >= e.fireAt) {
           const ang = Math.atan2(best.y - e.y, best.x - e.x);
           const speed = t.projSpeed || 160;
           const vx = Math.cos(ang) * speed, vy = Math.sin(ang) * speed;
@@ -2048,8 +2104,10 @@ const Game = {
           this.spawnProjectile({ id: pid, x: e.x, y: e.y, vx, vy, dieAt: now + ttl, color: t.eye });
           Net.send({ type: 'enemy_shot', id: pid, x: e.x, y: e.y, vx, vy, ttl, color: t.eye });
           e.fireAt = now + (t.fireMs || 2400);
-        } else {
-          e.fireAt = now + 600;
+        } else if (!best || bestD > range) {
+          // No shot available — drift so shooters don't sit motionless.
+          this._wanderEnemy(e, t, now, dt);
+          if (best == null) e.fireAt = now + 600;
         }
       }
 
@@ -2075,6 +2133,19 @@ const Game = {
             break;
           }
         }
+      }
+    }
+
+    // After per-enemy movement, push overlapping ghosts apart and re-clamp
+    // any that got shoved into a wall.
+    this._separateEnemies(dt);
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+      if (this.isMobBlocked(Math.floor(e.x / T), Math.floor(e.y / T))) {
+        const hx = e.spawnTileX * T + T/2, hy = e.spawnTileY * T + T/2;
+        const ang = Math.atan2(hy - e.y, hx - e.x);
+        e.x += Math.cos(ang) * 4;
+        e.y += Math.sin(ang) * 4;
       }
     }
   },
