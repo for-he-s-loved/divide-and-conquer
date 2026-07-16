@@ -353,6 +353,16 @@
       };
       render();
       if (saved > 0) status.textContent = `Starting at Round ${saved + 1} — ${LEVEL_NAMES[saved]}.`;
+      // #admin in the URL auto-opens the panel and scrolls to it.
+      const openIfHash = () => {
+        if (location.hash !== '#admin') return;
+        const panel = document.getElementById('admin-panel');
+        if (!panel) return;
+        panel.open = true;
+        panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      };
+      openIfHash();
+      window.addEventListener('hashchange', openIfHash);
       // Console shortcut for mid-game jumps (host only — broadcasts to joiner too).
       window.jumpToLevel = function (idx) {
         if (typeof Game === 'undefined' || !Game.phaserGame) { console.warn('Game not started yet'); return; }
