@@ -823,6 +823,13 @@ const Game = {
     this.guards = [];
     this.activePlate = null;
     this.pendingQuestion = null;
+    // Per-player question-answer immunity. Instead of freezing the whole
+    // world while a plate is being answered, the player on the plate is
+    // just untargetable + immune. 1s grace after submitting.
+    this._answering = false;
+    this._immuneUntil = 0;
+    this._partnerAnswering = false;
+    this._partnerImmuneUntil = 0;
     this.finishedMe = false;
     this.finishedThem = false;
     this.roundOver = false;
@@ -1918,14 +1925,29 @@ const Game = {
     }
   },
 
-  reviveQuestionActive() {
-    // True whenever any question panel is open — freezes ghosts/projectiles/guards.
-    return !!this.pendingQuestion;
+  // ─── Per-player answer immunity ─────────────────────────────────
+  // Ghosts/guards/projectiles keep moving, but the answering player is
+  // untargetable and takes no damage. 1s grace after they submit so
+  // enemies can't insta-hit them mid-transition.
+  _beginAnswering() {
+    if (this._answering) return;
+    this._answering = true;
+    try { Net.send({ type: 'answering', on: true }); } catch (_) {}
+  },
+  _endAnswering() {
+    if (!this._answering) return;
+    this._answering = false;
+    this._immuneUntil = performance.now() + 1000;
+    try { Net.send({ type: 'answering', on: false, graceMs: 1000 }); } catch (_) {}
+  },
+  isPlayerImmune(pid) {
+    const now = performance.now();
+    if (pid === Net.playerId) return this._answering || now < (this._immuneUntil || 0);
+    return this._partnerAnswering || now < (this._partnerImmuneUntil || 0);
   },
 
   enemyTick(time) {
     if (!Net.isHost) return;
-    if (this.reviveQuestionActive()) return;
     if (!this.enemies || this.enemies.length === 0) return;
     const T = this.tile();
     const now = performance.now();
@@ -1933,9 +1955,14 @@ const Game = {
     const meBody = this.me && this.me.body;
     const otherBody = this.other && this.other.body;
     const players = [];
-    if (meBody && (this.playerHp[Net.playerId] || 0) > 0) players.push({ pid: Net.playerId, x: meBody.x, y: meBody.y });
+    // Immune (answering) players are invisible to ghosts — no aggro, no contact.
+    if (meBody && (this.playerHp[Net.playerId] || 0) > 0 && !this.isPlayerImmune(Net.playerId)) {
+      players.push({ pid: Net.playerId, x: meBody.x, y: meBody.y });
+    }
     const otherPid = Net.playerId === 1 ? 2 : 1;
-    if (otherBody && (this.playerHp[otherPid] || 0) > 0) players.push({ pid: otherPid, x: otherBody.x, y: otherBody.y });
+    if (otherBody && (this.playerHp[otherPid] || 0) > 0 && !this.isPlayerImmune(otherPid)) {
+      players.push({ pid: otherPid, x: otherBody.x, y: otherBody.y });
+    }
 
     for (const e of this.enemies) {
       if (!e.alive) continue;
@@ -2078,7 +2105,7 @@ const Game = {
 
   applyEnemyDamage(pid, dmg, kx, ky, enemyId) {
     if (this.roundOver) return;
-    if (pid === Net.playerId && this.pendingQuestion) return; // immune while answering
+    if (this.isPlayerImmune(pid)) return; // immune while answering + 1s post-answer grace
     const now = performance.now();
     if (now < this.reviveInvulnUntil) return;
     if (this.bossPhase === 'intro') return; // wait until fight begins
@@ -2127,7 +2154,6 @@ const Game = {
   },
 
   updateProjectiles(time) {
-    if (this.reviveQuestionActive()) return;
     if (!this.enemyProjectiles || this.enemyProjectiles.length === 0) return;
     const dt = Math.min(0.05, (this.scene.game.loop.delta || 16) / 1000);
     const now = performance.now();
@@ -2140,7 +2166,7 @@ const Game = {
       p.sprite.x = p.x; p.sprite.y = p.y;
       let dead = now >= p.dieAt;
       // Host detects hit on local player (self) only; clients each detect themselves
-      if (!dead && meBody && (this.playerHp[myPid] || 0) > 0 && performance.now() >= this.reviveInvulnUntil) {
+      if (!dead && meBody && (this.playerHp[myPid] || 0) > 0 && performance.now() >= this.reviveInvulnUntil && !this.isPlayerImmune(myPid)) {
         if (Math.hypot(p.x - meBody.x, p.y - meBody.y) < 16) {
           this.applyEnemyDamage(myPid, 1, meBody.x - p.x, meBody.y - p.y, null);
           dead = true;
@@ -2419,6 +2445,7 @@ const Game = {
     const q = Questions.generate(this._bossQSeed, Net.playerId, this.currentLevelIdx);
     q._revive = true;
     this.pendingQuestion = q;
+    this._beginAnswering();
     const panel = document.getElementById('question-panel');
     panel.classList.remove('hidden');
     document.getElementById('question-text').textContent = q.prompt;
@@ -2484,7 +2511,6 @@ const Game = {
 
   reviveBossTick() {
     if (!Net.isHost) return;
-    if (this.reviveQuestionActive()) return;
     if (!this.reviveBoss || this.reviveBossPhase !== 'fight') return;
     if (this.reviveAttacks.length > 0) return;
     const now = performance.now();
@@ -2492,6 +2518,9 @@ const Game = {
     // Target only the surviving player
     const downed = this.downedPid();
     const aliveId = downed === 1 ? 2 : (downed === 2 ? 1 : Net.playerId);
+    // Don't launch an attack against a player who's currently answering —
+    // the whole point of the plate is to be safe.
+    if (this.isPlayerImmune(aliveId)) return;
     const aliveBody = aliveId === Net.playerId ? (this.me && this.me.body) : (this.other && this.other.body);
     if (!aliveBody) return;
     const att = {
@@ -2519,11 +2548,6 @@ const Game = {
 
   updateReviveAttacks() {
     if (!this.reviveAttacks || this.reviveAttacks.length === 0) return;
-    if (this.reviveQuestionActive()) {
-      const dt = (this.scene && this.scene.game.loop.delta) || 16;
-      for (const att of this.reviveAttacks) att.startedAt += dt;
-      return;
-    }
     const now = performance.now();
     const remaining = [];
     let anyEnded = false;
@@ -2535,7 +2559,7 @@ const Game = {
         att.teleRing.setStrokeStyle(4, 0xbbf7d0, 1);
         this.scene.cameras.main.shake(120, 0.01);
         this.bossHitSound();
-        if (att.targetPid === Net.playerId && (this.playerHp[Net.playerId] || 0) > 0 && performance.now() >= this.reviveInvulnUntil) {
+        if (att.targetPid === Net.playerId && (this.playerHp[Net.playerId] || 0) > 0 && performance.now() >= this.reviveInvulnUntil && !this.isPlayerImmune(Net.playerId)) {
           const dist = Math.hypot(this.me.body.x - att.x, this.me.body.y - att.y);
           if (dist <= att.damageRadius) {
             this.applyEnemyDamage(Net.playerId, 1, this.me.body.x - att.x, this.me.body.y - att.y, null);
@@ -2791,6 +2815,7 @@ const Game = {
     const q = Questions.generate(this._bossQSeed, Net.playerId, this.currentLevelIdx);
     q._boss = true;
     this.pendingQuestion = q;
+    this._beginAnswering();
     const panel = document.getElementById('question-panel');
     panel.classList.remove('hidden');
     document.getElementById('question-text').textContent = q.prompt;
@@ -2989,7 +3014,7 @@ const Game = {
 
   takeBossDamage(now, att) {
     if (this.roundOver) return;
-    if (this.pendingQuestion) return; // immune while answering
+    if (this.isPlayerImmune(Net.playerId)) return; // immune while answering + 1s grace
     if (now < this.reviveInvulnUntil) return;
     this.playerHp[Net.playerId] = Math.max(0, this.playerHp[Net.playerId] - 4); // boss attacks deal a full heart
     this.updatePlayerHearts();
@@ -3415,7 +3440,6 @@ const Game = {
   },
 
   updateGuards(time) {
-    if (this.reviveQuestionActive()) return;
     for (const g of this.guards) {
       const t = (time % g.period) / g.period;
       const phase = Math.abs(t - 0.5) * 2;
@@ -3423,7 +3447,7 @@ const Game = {
       g.container.x = x;
       g.container.y = g.y + Math.sin(time / 200) * 3;
 
-      if (this.stunned || this.finishedMe) continue;
+      if (this.stunned || this.finishedMe || this.isPlayerImmune(Net.playerId)) continue;
       const dx = this.me.body.x - x;
       const dy = this.me.body.y - g.container.y;
       if (Math.hypot(dx, dy) < 23) this.stunMe(time, g);
@@ -3491,6 +3515,7 @@ const Game = {
   showQuestion(gateId) {
     const q = Questions.generate(gateId, Net.playerId, this.currentLevelIdx);
     this.pendingQuestion = q;
+    this._beginAnswering();
     const panel = document.getElementById('question-panel');
     panel.classList.remove('hidden');
     document.getElementById('question-text').textContent = q.prompt;
@@ -3544,6 +3569,7 @@ const Game = {
     document.getElementById('timer-bar').classList.add('hidden');
     this.pendingQuestion = null;
     this.questionTimerActive = false;
+    this._endAnswering();
   },
 
   tickQuestionTimer() {
@@ -3558,6 +3584,7 @@ const Game = {
       SFX.wrong();
       this.scene.cameras.main.shake(120, 0.006);
       this.pendingQuestion = null;
+      this._endAnswering();
     }
   },
 
@@ -3854,6 +3881,12 @@ const Game = {
         App.chatSystem(`🏁 Partner reached the finish.`);
       }
       this.checkRoundComplete();
+    } else if (msg.type === 'answering') {
+      // Partner started/stopped answering a question — mirror their
+      // immunity locally so this side's ghosts also ignore them (only
+      // matters on host, which authoritatively targets enemies).
+      this._partnerAnswering = !!msg.on;
+      if (!msg.on) this._partnerImmuneUntil = performance.now() + (msg.graceMs || 1000);
     } else if (msg.type === 'voice-ready') {
       Voice.onPartnerReady();
     } else if (msg.type === 'speaking') {
