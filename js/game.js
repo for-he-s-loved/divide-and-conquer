@@ -3664,6 +3664,10 @@ const Game = {
   hideQuestion() {
     document.getElementById('question-panel').classList.add('hidden');
     document.getElementById('timer-bar').classList.add('hidden');
+    // Blur the answer input — otherwise focus stays and update() locks
+    // player velocity to 0 (INPUT focus check). Symptom: after killing the
+    // boss on a correct answer you can't walk to the door.
+    try { document.getElementById('answer-input').blur(); } catch (_) {}
     this.pendingQuestion = null;
     this.questionTimerActive = false;
     this._endAnswering();
